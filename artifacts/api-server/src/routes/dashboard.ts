@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, tasksTable, employeesTable, departmentsTable, kpisTable, activityLogTable } from "@workspace/db";
-import { eq, count, sql, lt } from "drizzle-orm";
+import { db, tasksTable, employeesTable, departmentsTable, kpisTable, krasTable, activityLogTable } from "@workspace/db";
+import { eq, count, sql, isNotNull, and } from "drizzle-orm";
+import { GetEmployeeDashboardSummaryQueryParams, GetPendingApprovalsQueryParams } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -19,7 +20,10 @@ router.get("/dashboard/summary", async (req, res) => {
   const [completedTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "completed"));
   const [pendingTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "pending"));
   const [delayedTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "delayed"));
-  const [pendingApprovals] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "in_progress"));
+
+  const [pendingTaskApprovals] = await db.select({ count: count() }).from(tasksTable).where(isNotNull(tasksTable.requestedStatus));
+  const [pendingKraApprovals] = await db.select({ count: count() }).from(krasTable).where(eq(krasTable.kraStatus, "submitted"));
+  const pendingApprovals = Number(pendingTaskApprovals.count) + Number(pendingKraApprovals.count);
 
   const kpiScores = await db.select({ score: kpisTable.totalScore }).from(kpisTable);
   const avgKpiScore = kpiScores.length
@@ -34,7 +38,7 @@ router.get("/dashboard/summary", async (req, res) => {
     pendingTasks: Number(pendingTasks.count),
     delayedTasks: Number(delayedTasks.count),
     avgKpiScore: Math.round(avgKpiScore * 10) / 10,
-    pendingApprovals: Number(pendingApprovals.count),
+    pendingApprovals,
   });
 });
 
@@ -125,6 +129,7 @@ router.get("/dashboard/overdue-tasks", async (req, res) => {
     assignedToName: empMap.get(t.assignedToId) ?? "",
     createdByName: empMap.get(t.createdById) ?? "",
     departmentName: deptMap.get(t.departmentId) ?? "",
+    requestedStatus: t.requestedStatus ?? null,
     completedAt: t.completedAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
   })));
@@ -144,6 +149,114 @@ router.get("/dashboard/recent-activity", async (req, res) => {
     actorName: a.actorId ? (empMap.get(a.actorId) ?? "System") : "System",
     createdAt: a.createdAt.toISOString(),
   })));
+});
+
+router.get("/dashboard/employee-summary", async (req, res) => {
+  const { employeeId } = GetEmployeeDashboardSummaryQueryParams.parse(req.query);
+  const today = new Date().toISOString().split("T")[0];
+
+  const myTasks = await db.select().from(tasksTable).where(eq(tasksTable.assignedToId, employeeId));
+  const totalTasks = myTasks.length;
+  const completedTasks = myTasks.filter((t) => t.status === "completed" || t.status === "approved").length;
+  const pendingTasks = myTasks.filter((t) => t.status === "pending").length;
+  const overdueTasks = myTasks.filter(
+    (t) => t.dueDate && t.dueDate < today && t.status !== "completed" && t.status !== "approved"
+  ).length;
+
+  const statusCounts: Record<string, number> = {};
+  for (const task of myTasks) {
+    statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
+  }
+  const taskBreakdown = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
+
+  const kpis = await db.select().from(kpisTable)
+    .where(eq(kpisTable.employeeId, employeeId))
+    .orderBy(sql`${kpisTable.year} DESC, ${kpisTable.month} DESC`)
+    .limit(1);
+  const latestKpi = kpis[0] ?? null;
+
+  const myKras = await db.select().from(krasTable).where(eq(krasTable.employeeId, employeeId));
+  const kraAvg = myKras.length
+    ? myKras.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / myKras.length
+    : null;
+
+  const activities = await db.select().from(activityLogTable)
+    .where(eq(activityLogTable.actorId, employeeId))
+    .orderBy(sql`${activityLogTable.createdAt} DESC`)
+    .limit(8);
+
+  const emps = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e.name]));
+
+  res.json({
+    myTasks: totalTasks,
+    completedTasks,
+    pendingTasks,
+    overdueTasks,
+    myKpiScore: latestKpi ? Math.round(latestKpi.totalScore * 10) / 10 : null,
+    myKpiRating: latestKpi ? calcRating(latestKpi.totalScore) : null,
+    myKraAvg: kraAvg !== null ? Math.round((kraAvg as number) * 10) / 10 : null,
+    taskBreakdown,
+    recentActivity: activities.map((a) => ({
+      ...a,
+      actorName: a.actorId ? (empMap.get(a.actorId) ?? "System") : "System",
+      createdAt: a.createdAt.toISOString(),
+    })),
+  });
+});
+
+router.get("/dashboard/pending-approvals", async (req, res) => {
+  const params = GetPendingApprovalsQueryParams.parse(req.query);
+  const { departmentId, role } = params;
+
+  const kraStatusValues = role === "hod" ? ["submitted", "manager_approved"] : ["submitted"];
+
+  const kraConditions: ReturnType<typeof eq>[] = [];
+  for (const status of kraStatusValues) {
+    kraConditions.push(eq(krasTable.kraStatus, status));
+  }
+
+  const allKras = await db.select().from(krasTable);
+  const pendingKras = allKras.filter((k) => {
+    if (!kraStatusValues.includes(k.kraStatus)) return false;
+    if (departmentId && k.departmentId !== departmentId) return false;
+    return true;
+  });
+
+  const allTasks = await db.select().from(tasksTable);
+  const pendingTasks = allTasks.filter((t) => {
+    if (!t.requestedStatus) return false;
+    if (departmentId && t.departmentId !== departmentId) return false;
+    return true;
+  });
+
+  const emps = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e.name]));
+  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
+  const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+
+  res.json({
+    kras: pendingKras.map((k) => ({
+      id: k.id,
+      title: k.title,
+      employeeId: k.employeeId ?? 0,
+      employeeName: k.employeeId ? (empMap.get(k.employeeId) ?? "") : "",
+      departmentName: deptMap.get(k.departmentId) ?? "",
+      achievementPct: k.achievementPct ?? null,
+      kraStatus: k.kraStatus,
+      submittedAt: k.submittedAt?.toISOString() ?? null,
+    })),
+    tasks: pendingTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      assignedToId: t.assignedToId,
+      assignedToName: empMap.get(t.assignedToId) ?? "",
+      departmentName: deptMap.get(t.departmentId) ?? "",
+      status: t.status,
+      requestedStatus: t.requestedStatus!,
+      progressPct: t.progressPct,
+    })),
+  });
 });
 
 export default router;

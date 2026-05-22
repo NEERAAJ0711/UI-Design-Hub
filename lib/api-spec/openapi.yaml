@@ -409,6 +409,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Kra"
 
+  /kras/{id}/submit:
+    patch:
+      operationId: submitKraForClosure
+      tags: [kras]
+      summary: Employee submits KRA for closure
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kra"
+
+  /kras/{id}/approve-close:
+    patch:
+      operationId: approveKraClosure
+      tags: [kras]
+      summary: Manager or HOD approves/rejects KRA closure
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveCloseInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kra"
+
   # ── KPIs ──────────────────────────────────────────────────────────────────────
   /kpis:
     get:
@@ -625,7 +669,7 @@ paths:
     patch:
       operationId: updateTaskStatus
       tags: [tasks]
-      summary: Update task status
+      summary: Update task status (manager/HOD/management direct)
       parameters:
         - name: id
           in: path
@@ -638,6 +682,56 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/TaskStatusInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}/request-status:
+    patch:
+      operationId: requestTaskStatus
+      tags: [tasks]
+      summary: Employee requests a task status change (pending approval)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskStatusRequestInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}/approve-status:
+    patch:
+      operationId: approveTaskStatus
+      tags: [tasks]
+      summary: Manager or HOD approves/rejects an employee task status request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskStatusApprovalInput"
       responses:
         "200":
           description: Updated
@@ -789,6 +883,51 @@ paths:
                 items:
                   $ref: "#/components/schemas/ActivityItem"
 
+  /dashboard/employee-summary:
+    get:
+      operationId: getEmployeeDashboardSummary
+      tags: [dashboard]
+      summary: Get employee-specific dashboard summary
+      parameters:
+        - name: employeeId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Employee dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeDashboardSummary"
+
+  /dashboard/pending-approvals:
+    get:
+      operationId: getPendingApprovals
+      tags: [dashboard]
+      summary: Get pending KRA closures and task status requests (manager/HOD)
+      parameters:
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+        - name: approverId
+          in: query
+          schema:
+            type: integer
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pending approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingApprovals"
+
 components:
   schemas:
     LoginInput:
@@ -898,7 +1037,7 @@ components:
     # ── KRA ─────────────────────────────────────────────────────────────────────
     Kra:
       type: object
-      required: [id, title, weightage, departmentId, createdAt]
+      required: [id, title, weightage, departmentId, kraStatus, createdAt]
       properties:
         id:             { type: integer }
         title:          { type: string }
@@ -910,6 +1049,9 @@ components:
         employeeId:     { type: ["integer", "null"] }
         employeeName:   { type: ["string", "null"] }
         reviewPeriod:   { type: string, enum: [monthly, quarterly, yearly] }
+        kraStatus:      { type: string, enum: [active, submitted, manager_approved, approved, rejected] }
+        submittedAt:    { type: ["string", "null"] }
+        closedAt:       { type: ["string", "null"] }
         createdAt:      { type: string }
 
     KraInput:
@@ -990,6 +1132,7 @@ components:
         title:            { type: string }
         description:      { type: ["string", "null"] }
         status:           { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected] }
+        requestedStatus:  { type: ["string", "null"] }
         priority:         { type: string, enum: [high, medium, low] }
         dueDate:          { type: ["string", "null"] }
         completedAt:      { type: ["string", "null"] }
@@ -1102,9 +1245,89 @@ components:
       required: [id, type, description, actorName, createdAt]
       properties:
         id:          { type: integer }
-        type:        { type: string, enum: [task_created, task_completed, task_delayed, kpi_updated, kra_scored, employee_added] }
+        type:        { type: string, enum: [task_created, task_completed, task_delayed, kpi_updated, kra_scored, employee_added, kra_submitted, kra_approved, kra_rejected, task_status_requested, task_status_approved, task_status_rejected] }
         description: { type: string }
         actorName:   { type: string }
         entityId:    { type: ["integer", "null"] }
         entityType:  { type: ["string", "null"] }
         createdAt:   { type: string }
+
+    ApproveCloseInput:
+      type: object
+      required: [approved]
+      properties:
+        approved: { type: boolean }
+        reason:   { type: string }
+
+    TaskStatusRequestInput:
+      type: object
+      required: [status]
+      properties:
+        status:      { type: string, enum: [in_progress, completed, delayed] }
+        progressPct: { type: integer }
+
+    TaskStatusApprovalInput:
+      type: object
+      required: [approved]
+      properties:
+        approved: { type: boolean }
+        reason:   { type: string }
+
+    EmployeeDashboardSummary:
+      type: object
+      required: [myTasks, completedTasks, pendingTasks, overdueTasks, myKpiScore, myKpiRating, myKraAvg, taskBreakdown, recentActivity]
+      properties:
+        myTasks:        { type: integer }
+        completedTasks: { type: integer }
+        pendingTasks:   { type: integer }
+        overdueTasks:   { type: integer }
+        myKpiScore:     { type: ["number", "null"] }
+        myKpiRating:    { type: ["string", "null"] }
+        myKraAvg:       { type: ["number", "null"] }
+        taskBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskStatusCount"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+
+    PendingKraApproval:
+      type: object
+      required: [id, title, employeeId, employeeName, departmentName, kraStatus]
+      properties:
+        id:             { type: integer }
+        title:          { type: string }
+        employeeId:     { type: integer }
+        employeeName:   { type: string }
+        departmentName: { type: string }
+        achievementPct: { type: ["number", "null"] }
+        kraStatus:      { type: string }
+        submittedAt:    { type: ["string", "null"] }
+
+    PendingTaskApproval:
+      type: object
+      required: [id, title, assignedToId, assignedToName, departmentName, status, requestedStatus]
+      properties:
+        id:               { type: integer }
+        title:            { type: string }
+        assignedToId:     { type: integer }
+        assignedToName:   { type: string }
+        departmentName:   { type: string }
+        status:           { type: string }
+        requestedStatus:  { type: string }
+        progressPct:      { type: integer }
+
+    PendingApprovals:
+      type: object
+      required: [kras, tasks]
+      properties:
+        kras:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingKraApproval"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingTaskApproval"

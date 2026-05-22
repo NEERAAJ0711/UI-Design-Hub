@@ -152,6 +152,17 @@ export const KraReviewPeriod = {
   yearly: 'yearly',
 } as const;
 
+export type KraKraStatus = typeof KraKraStatus[keyof typeof KraKraStatus];
+
+
+export const KraKraStatus = {
+  active: 'active',
+  submitted: 'submitted',
+  manager_approved: 'manager_approved',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
 export interface Kra {
   id: number;
   title: string;
@@ -167,6 +178,11 @@ export interface Kra {
   /** @nullable */
   employeeName?: string | null;
   reviewPeriod?: KraReviewPeriod;
+  kraStatus: KraKraStatus;
+  /** @nullable */
+  submittedAt?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
   createdAt: string;
 }
 
@@ -288,6 +304,8 @@ export interface Task {
   /** @nullable */
   description?: string | null;
   status: TaskStatus;
+  /** @nullable */
+  requestedStatus?: string | null;
   priority: TaskPriority;
   /** @nullable */
   dueDate?: string | null;
@@ -445,6 +463,12 @@ export const ActivityItemType = {
   kpi_updated: 'kpi_updated',
   kra_scored: 'kra_scored',
   employee_added: 'employee_added',
+  kra_submitted: 'kra_submitted',
+  kra_approved: 'kra_approved',
+  kra_rejected: 'kra_rejected',
+  task_status_requested: 'task_status_requested',
+  task_status_approved: 'task_status_approved',
+  task_status_rejected: 'task_status_rejected',
 } as const;
 
 export interface ActivityItem {
@@ -457,6 +481,74 @@ export interface ActivityItem {
   /** @nullable */
   entityType?: string | null;
   createdAt: string;
+}
+
+export interface ApproveCloseInput {
+  approved: boolean;
+  reason?: string;
+}
+
+export type TaskStatusRequestInputStatus = typeof TaskStatusRequestInputStatus[keyof typeof TaskStatusRequestInputStatus];
+
+
+export const TaskStatusRequestInputStatus = {
+  in_progress: 'in_progress',
+  completed: 'completed',
+  delayed: 'delayed',
+} as const;
+
+export interface TaskStatusRequestInput {
+  status: TaskStatusRequestInputStatus;
+  progressPct?: number;
+}
+
+export interface TaskStatusApprovalInput {
+  approved: boolean;
+  reason?: string;
+}
+
+export interface EmployeeDashboardSummary {
+  myTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  overdueTasks: number;
+  /** @nullable */
+  myKpiScore: number | null;
+  /** @nullable */
+  myKpiRating: string | null;
+  /** @nullable */
+  myKraAvg: number | null;
+  taskBreakdown: TaskStatusCount[];
+  recentActivity: ActivityItem[];
+}
+
+export interface PendingKraApproval {
+  id: number;
+  title: string;
+  employeeId: number;
+  employeeName: string;
+  departmentName: string;
+  /** @nullable */
+  achievementPct?: number | null;
+  kraStatus: string;
+  /** @nullable */
+  submittedAt?: string | null;
+}
+
+export interface PendingTaskApproval {
+  id: number;
+  title: string;
+  assignedToId: number;
+  assignedToName: string;
+  departmentName: string;
+  status: string;
+  requestedStatus: string;
+  progressPct?: number;
+}
+
+export interface PendingApprovals {
+  kras: PendingKraApproval[];
+  tasks: PendingTaskApproval[];
 }
 
 export type Logout200 = {
@@ -493,5 +585,15 @@ limit?: number;
 
 export type GetRecentActivityParams = {
 limit?: number;
+};
+
+export type GetEmployeeDashboardSummaryParams = {
+employeeId: number;
+};
+
+export type GetPendingApprovalsParams = {
+departmentId?: number;
+approverId?: number;
+role?: string;
 };
 

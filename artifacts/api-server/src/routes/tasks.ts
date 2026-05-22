@@ -13,6 +13,10 @@ import {
   ListTaskCommentsParams,
   AddTaskCommentParams,
   AddTaskCommentBody,
+  RequestTaskStatusParams,
+  RequestTaskStatusBody,
+  ApproveTaskStatusParams,
+  ApproveTaskStatusBody,
 } from "@workspace/api-zod";
 
 const router = Router();
@@ -26,6 +30,7 @@ async function enrichTask(task: typeof tasksTable.$inferSelect) {
     assignedToName: assignee?.name ?? "",
     createdByName: creator?.name ?? "",
     departmentName: dept?.name ?? "",
+    requestedStatus: task.requestedStatus ?? null,
     completedAt: task.completedAt?.toISOString() ?? null,
     createdAt: task.createdAt.toISOString(),
   };
@@ -53,6 +58,7 @@ router.get("/tasks", async (req, res) => {
     assignedToName: empMap.get(t.assignedToId) ?? "",
     createdByName: empMap.get(t.createdById) ?? "",
     departmentName: deptMap.get(t.departmentId) ?? "",
+    requestedStatus: t.requestedStatus ?? null,
     completedAt: t.completedAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
   })));
@@ -99,7 +105,7 @@ router.patch("/tasks/:id/status", async (req, res) => {
   const { status } = UpdateTaskStatusBody.parse(req.body);
   const completedAt = status === "completed" ? new Date() : null;
   const [task] = await db.update(tasksTable)
-    .set({ status, ...(completedAt !== undefined ? { completedAt } : {}) })
+    .set({ status, requestedStatus: null, ...(completedAt !== undefined ? { completedAt } : {}) })
     .where(eq(tasksTable.id, id))
     .returning();
   if (!task) { res.status(404).json({ error: "Not found" }); return; }
@@ -120,6 +126,54 @@ router.patch("/tasks/:id/status", async (req, res) => {
       entityType: "task",
     });
   }
+
+  res.json(await enrichTask(task));
+});
+
+router.patch("/tasks/:id/request-status", async (req, res) => {
+  const { id } = RequestTaskStatusParams.parse({ id: Number(req.params.id) });
+  const { status, progressPct } = RequestTaskStatusBody.parse(req.body);
+
+  const updateData: Record<string, unknown> = { requestedStatus: status };
+  if (progressPct !== undefined) updateData.progressPct = progressPct;
+
+  const [task] = await db.update(tasksTable).set(updateData).where(eq(tasksTable.id, id)).returning();
+  if (!task) { res.status(404).json({ error: "Not found" }); return; }
+
+  await db.insert(activityLogTable).values({
+    type: "task_status_requested",
+    description: `"${status}" status requested for task "${task.title}"`,
+    actorId: task.assignedToId,
+    entityId: task.id,
+    entityType: "task",
+  });
+
+  res.json(await enrichTask(task));
+});
+
+router.patch("/tasks/:id/approve-status", async (req, res) => {
+  const { id } = ApproveTaskStatusParams.parse({ id: Number(req.params.id) });
+  const { approved } = ApproveTaskStatusBody.parse(req.body);
+
+  const [existing] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+  const updateData: Record<string, unknown> = { requestedStatus: null };
+  if (approved && existing.requestedStatus) {
+    updateData.status = existing.requestedStatus;
+    if (existing.requestedStatus === "completed") {
+      updateData.completedAt = new Date();
+    }
+  }
+
+  const [task] = await db.update(tasksTable).set(updateData).where(eq(tasksTable.id, id)).returning();
+
+  await db.insert(activityLogTable).values({
+    type: approved ? "task_status_approved" : "task_status_rejected",
+    description: `Task "${task.title}" status request ${approved ? "approved" : "rejected"}`,
+    entityId: task.id,
+    entityType: "task",
+  });
 
   res.json(await enrichTask(task));
 });

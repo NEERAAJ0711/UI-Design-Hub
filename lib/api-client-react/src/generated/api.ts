@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActivityItem,
+  ApproveCloseInput,
   CurrentUser,
   DashboardSummary,
   Department,
@@ -28,10 +29,13 @@ import type {
   DepartmentPerformance,
   DepartmentUpdate,
   Employee,
+  EmployeeDashboardSummary,
   EmployeeInput,
   EmployeePerformance,
   EmployeeUpdate,
   ErrorResponse,
+  GetEmployeeDashboardSummaryParams,
+  GetPendingApprovalsParams,
   GetRecentActivityParams,
   GetTopPerformersParams,
   HealthStatus,
@@ -48,12 +52,15 @@ import type {
   ListTasksParams,
   LoginInput,
   Logout200,
+  PendingApprovals,
   Task,
   TaskComment,
   TaskCommentInput,
   TaskInput,
+  TaskStatusApprovalInput,
   TaskStatusCount,
   TaskStatusInput,
+  TaskStatusRequestInput,
   TaskUpdate
 } from './api.schemas';
 
@@ -1551,6 +1558,148 @@ export const useScoreKra = <TError = ErrorType<unknown>,
       return useMutation(getScoreKraMutationOptions(options));
     }
 
+export const getSubmitKraForClosureUrl = (id: number,) => {
+
+
+
+
+  return `/api/kras/${id}/submit`
+}
+
+/**
+ * @summary Employee submits KRA for closure
+ */
+export const submitKraForClosure = async (id: number, options?: RequestInit): Promise<Kra> => {
+
+  return customFetch<Kra>(getSubmitKraForClosureUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+export const getSubmitKraForClosureMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitKraForClosure>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitKraForClosure>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['submitKraForClosure'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitKraForClosure>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  submitKraForClosure(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitKraForClosureMutationResult = NonNullable<Awaited<ReturnType<typeof submitKraForClosure>>>
+
+    export type SubmitKraForClosureMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Employee submits KRA for closure
+ */
+export const useSubmitKraForClosure = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitKraForClosure>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitKraForClosure>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSubmitKraForClosureMutationOptions(options));
+    }
+
+export const getApproveKraClosureUrl = (id: number,) => {
+
+
+
+
+  return `/api/kras/${id}/approve-close`
+}
+
+/**
+ * @summary Manager or HOD approves/rejects KRA closure
+ */
+export const approveKraClosure = async (id: number,
+    approveCloseInput: ApproveCloseInput, options?: RequestInit): Promise<Kra> => {
+
+  return customFetch<Kra>(getApproveKraClosureUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      approveCloseInput,)
+  }
+);}
+
+
+
+
+export const getApproveKraClosureMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveKraClosure>>, TError,{id: number;data: BodyType<ApproveCloseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveKraClosure>>, TError,{id: number;data: BodyType<ApproveCloseInput>}, TContext> => {
+
+const mutationKey = ['approveKraClosure'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveKraClosure>>, {id: number;data: BodyType<ApproveCloseInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveKraClosure(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveKraClosureMutationResult = NonNullable<Awaited<ReturnType<typeof approveKraClosure>>>
+    export type ApproveKraClosureMutationBody = BodyType<ApproveCloseInput>
+    export type ApproveKraClosureMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manager or HOD approves/rejects KRA closure
+ */
+export const useApproveKraClosure = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveKraClosure>>, TError,{id: number;data: BodyType<ApproveCloseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveKraClosure>>,
+        TError,
+        {id: number;data: BodyType<ApproveCloseInput>},
+        TContext
+      > => {
+      return useMutation(getApproveKraClosureMutationOptions(options));
+    }
+
 export const getListKpisUrl = (params?: ListKpisParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2308,7 +2457,7 @@ export const getUpdateTaskStatusUrl = (id: number,) => {
 }
 
 /**
- * @summary Update task status
+ * @summary Update task status (manager/HOD/management direct)
  */
 export const updateTaskStatus = async (id: number,
     taskStatusInput: TaskStatusInput, options?: RequestInit): Promise<Task> => {
@@ -2358,7 +2507,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateTaskStatusMutationError = ErrorType<unknown>
 
     /**
- * @summary Update task status
+ * @summary Update task status (manager/HOD/management direct)
  */
 export const useUpdateTaskStatus = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2369,6 +2518,150 @@ export const useUpdateTaskStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateTaskStatusMutationOptions(options));
+    }
+
+export const getRequestTaskStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/tasks/${id}/request-status`
+}
+
+/**
+ * @summary Employee requests a task status change (pending approval)
+ */
+export const requestTaskStatus = async (id: number,
+    taskStatusRequestInput: TaskStatusRequestInput, options?: RequestInit): Promise<Task> => {
+
+  return customFetch<Task>(getRequestTaskStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      taskStatusRequestInput,)
+  }
+);}
+
+
+
+
+export const getRequestTaskStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusRequestInput>}, TContext> => {
+
+const mutationKey = ['requestTaskStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestTaskStatus>>, {id: number;data: BodyType<TaskStatusRequestInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestTaskStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestTaskStatusMutationResult = NonNullable<Awaited<ReturnType<typeof requestTaskStatus>>>
+    export type RequestTaskStatusMutationBody = BodyType<TaskStatusRequestInput>
+    export type RequestTaskStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Employee requests a task status change (pending approval)
+ */
+export const useRequestTaskStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestTaskStatus>>,
+        TError,
+        {id: number;data: BodyType<TaskStatusRequestInput>},
+        TContext
+      > => {
+      return useMutation(getRequestTaskStatusMutationOptions(options));
+    }
+
+export const getApproveTaskStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/tasks/${id}/approve-status`
+}
+
+/**
+ * @summary Manager or HOD approves/rejects an employee task status request
+ */
+export const approveTaskStatus = async (id: number,
+    taskStatusApprovalInput: TaskStatusApprovalInput, options?: RequestInit): Promise<Task> => {
+
+  return customFetch<Task>(getApproveTaskStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      taskStatusApprovalInput,)
+  }
+);}
+
+
+
+
+export const getApproveTaskStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusApprovalInput>}, TContext> => {
+
+const mutationKey = ['approveTaskStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveTaskStatus>>, {id: number;data: BodyType<TaskStatusApprovalInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveTaskStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveTaskStatusMutationResult = NonNullable<Awaited<ReturnType<typeof approveTaskStatus>>>
+    export type ApproveTaskStatusMutationBody = BodyType<TaskStatusApprovalInput>
+    export type ApproveTaskStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manager or HOD approves/rejects an employee task status request
+ */
+export const useApproveTaskStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTaskStatus>>, TError,{id: number;data: BodyType<TaskStatusApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveTaskStatus>>,
+        TError,
+        {id: number;data: BodyType<TaskStatusApprovalInput>},
+        TContext
+      > => {
+      return useMutation(getApproveTaskStatusMutationOptions(options));
     }
 
 export const getListTaskCommentsUrl = (id: number,) => {
@@ -2984,6 +3277,174 @@ export function useGetRecentActivity<TData = Awaited<ReturnType<typeof getRecent
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRecentActivityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmployeeDashboardSummaryUrl = (params: GetEmployeeDashboardSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/employee-summary?${stringifiedParams}` : `/api/dashboard/employee-summary`
+}
+
+/**
+ * @summary Get employee-specific dashboard summary
+ */
+export const getEmployeeDashboardSummary = async (params: GetEmployeeDashboardSummaryParams, options?: RequestInit): Promise<EmployeeDashboardSummary> => {
+
+  return customFetch<EmployeeDashboardSummary>(getGetEmployeeDashboardSummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmployeeDashboardSummaryQueryKey = (params?: GetEmployeeDashboardSummaryParams,) => {
+    return [
+    `/api/dashboard/employee-summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEmployeeDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getEmployeeDashboardSummary>>, TError = ErrorType<unknown>>(params: GetEmployeeDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployeeDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmployeeDashboardSummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmployeeDashboardSummary>>> = ({ signal }) => getEmployeeDashboardSummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmployeeDashboardSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmployeeDashboardSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getEmployeeDashboardSummary>>>
+export type GetEmployeeDashboardSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get employee-specific dashboard summary
+ */
+
+export function useGetEmployeeDashboardSummary<TData = Awaited<ReturnType<typeof getEmployeeDashboardSummary>>, TError = ErrorType<unknown>>(
+ params: GetEmployeeDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployeeDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmployeeDashboardSummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPendingApprovalsUrl = (params?: GetPendingApprovalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/pending-approvals?${stringifiedParams}` : `/api/dashboard/pending-approvals`
+}
+
+/**
+ * @summary Get pending KRA closures and task status requests (manager/HOD)
+ */
+export const getPendingApprovals = async (params?: GetPendingApprovalsParams, options?: RequestInit): Promise<PendingApprovals> => {
+
+  return customFetch<PendingApprovals>(getGetPendingApprovalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPendingApprovalsQueryKey = (params?: GetPendingApprovalsParams,) => {
+    return [
+    `/api/dashboard/pending-approvals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPendingApprovalsQueryOptions = <TData = Awaited<ReturnType<typeof getPendingApprovals>>, TError = ErrorType<unknown>>(params?: GetPendingApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPendingApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPendingApprovalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPendingApprovals>>> = ({ signal }) => getPendingApprovals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPendingApprovals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPendingApprovalsQueryResult = NonNullable<Awaited<ReturnType<typeof getPendingApprovals>>>
+export type GetPendingApprovalsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get pending KRA closures and task status requests (manager/HOD)
+ */
+
+export function useGetPendingApprovals<TData = Awaited<ReturnType<typeof getPendingApprovals>>, TError = ErrorType<unknown>>(
+ params?: GetPendingApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPendingApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPendingApprovalsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

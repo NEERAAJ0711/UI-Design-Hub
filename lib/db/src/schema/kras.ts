@@ -11,6 +11,9 @@ export const krasTable = pgTable("kras", {
   departmentId: integer("department_id").notNull(),
   employeeId: integer("employee_id"),
   reviewPeriod: text("review_period").notNull().default("monthly"), // monthly | quarterly | yearly
+  kraStatus: text("kra_status").notNull().default("active"), // active | submitted | manager_approved | approved | rejected
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

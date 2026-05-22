@@ -10,6 +10,9 @@ import {
   ListKrasQueryParams,
   ScoreKraParams,
   ScoreKraBody,
+  SubmitKraForClosureParams,
+  ApproveKraClosureParams,
+  ApproveKraClosureBody,
 } from "@workspace/api-zod";
 
 const router = Router();
@@ -23,6 +26,8 @@ async function enrichKra(kra: typeof krasTable.$inferSelect) {
     ...kra,
     departmentName: dept?.name ?? "",
     employeeName: empName,
+    submittedAt: kra.submittedAt?.toISOString() ?? null,
+    closedAt: kra.closedAt?.toISOString() ?? null,
     createdAt: kra.createdAt.toISOString(),
   };
 }
@@ -46,6 +51,8 @@ router.get("/kras", async (req, res) => {
     ...k,
     departmentName: deptMap.get(k.departmentId) ?? "",
     employeeName: k.employeeId ? (empMap.get(k.employeeId) ?? null) : null,
+    submittedAt: k.submittedAt?.toISOString() ?? null,
+    closedAt: k.closedAt?.toISOString() ?? null,
     createdAt: k.createdAt.toISOString(),
   })));
 });
@@ -88,6 +95,57 @@ router.patch("/kras/:id/score", async (req, res) => {
     entityId: kra.id,
     entityType: "kra",
   });
+  res.json(await enrichKra(kra));
+});
+
+router.patch("/kras/:id/submit", async (req, res) => {
+  const { id } = SubmitKraForClosureParams.parse({ id: Number(req.params.id) });
+  const [kra] = await db.update(krasTable)
+    .set({ kraStatus: "submitted", submittedAt: new Date() })
+    .where(eq(krasTable.id, id))
+    .returning();
+  if (!kra) { res.status(404).json({ error: "Not found" }); return; }
+  await db.insert(activityLogTable).values({
+    type: "kra_submitted",
+    description: `KRA "${kra.title}" submitted for closure`,
+    actorId: kra.employeeId ?? undefined,
+    entityId: kra.id,
+    entityType: "kra",
+  });
+  res.json(await enrichKra(kra));
+});
+
+router.patch("/kras/:id/approve-close", async (req, res) => {
+  const { id } = ApproveKraClosureParams.parse({ id: Number(req.params.id) });
+  const { approved } = ApproveKraClosureBody.parse(req.body);
+
+  const [existing] = await db.select().from(krasTable).where(eq(krasTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+  let newStatus: string;
+  let extra: Record<string, Date> = {};
+
+  if (!approved) {
+    newStatus = "rejected";
+  } else if (existing.kraStatus === "submitted") {
+    newStatus = "manager_approved";
+  } else {
+    newStatus = "approved";
+    extra.closedAt = new Date();
+  }
+
+  const [kra] = await db.update(krasTable)
+    .set({ kraStatus: newStatus, ...extra })
+    .where(eq(krasTable.id, id))
+    .returning();
+
+  await db.insert(activityLogTable).values({
+    type: approved ? "kra_approved" : "kra_rejected",
+    description: `KRA "${kra.title}" ${approved ? `approved (${newStatus})` : "rejected"}`,
+    entityId: kra.id,
+    entityType: "kra",
+  });
+
   res.json(await enrichKra(kra));
 });
 

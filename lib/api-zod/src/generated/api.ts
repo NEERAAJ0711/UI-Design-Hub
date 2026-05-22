@@ -270,6 +270,9 @@ export const ListKrasResponseItem = zod.object({
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListKrasResponse = zod.array(ListKrasResponseItem)
@@ -309,6 +312,9 @@ export const GetKraResponse = zod.object({
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -339,6 +345,9 @@ export const UpdateKraResponse = zod.object({
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -373,6 +382,64 @@ export const ScoreKraResponse = zod.object({
   "employeeId": zod.number().nullish(),
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Employee submits KRA for closure
+ */
+export const SubmitKraForClosureParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SubmitKraForClosureResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "weightage": zod.number(),
+  "achievementPct": zod.number().nullish(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().optional(),
+  "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
+  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Manager or HOD approves/rejects KRA closure
+ */
+export const ApproveKraClosureParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApproveKraClosureBody = zod.object({
+  "approved": zod.boolean(),
+  "reason": zod.string().optional()
+})
+
+export const ApproveKraClosureResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "weightage": zod.number(),
+  "achievementPct": zod.number().nullish(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().optional(),
+  "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
+  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -505,6 +572,7 @@ export const ListTasksResponseItem = zod.object({
   "title": zod.string(),
   "description": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
@@ -553,6 +621,7 @@ export const GetTaskResponse = zod.object({
   "title": zod.string(),
   "description": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
@@ -592,6 +661,7 @@ export const UpdateTaskResponse = zod.object({
   "title": zod.string(),
   "description": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
@@ -617,7 +687,7 @@ export const DeleteTaskParams = zod.object({
 
 
 /**
- * @summary Update task status
+ * @summary Update task status (manager/HOD/management direct)
  */
 export const UpdateTaskStatusParams = zod.object({
   "id": zod.coerce.number()
@@ -632,6 +702,75 @@ export const UpdateTaskStatusResponse = zod.object({
   "title": zod.string(),
   "description": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
+  "priority": zod.enum(['high', 'medium', 'low']),
+  "dueDate": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdById": zod.number(),
+  "createdByName": zod.string().optional(),
+  "assignedToId": zod.number(),
+  "assignedToName": zod.string().optional(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().optional(),
+  "isRecurring": zod.boolean().optional(),
+  "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
+  "progressPct": zod.number().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Employee requests a task status change (pending approval)
+ */
+export const RequestTaskStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RequestTaskStatusBody = zod.object({
+  "status": zod.enum(['in_progress', 'completed', 'delayed']),
+  "progressPct": zod.number().optional()
+})
+
+export const RequestTaskStatusResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
+  "priority": zod.enum(['high', 'medium', 'low']),
+  "dueDate": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdById": zod.number(),
+  "createdByName": zod.string().optional(),
+  "assignedToId": zod.number(),
+  "assignedToName": zod.string().optional(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().optional(),
+  "isRecurring": zod.boolean().optional(),
+  "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
+  "progressPct": zod.number().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Manager or HOD approves/rejects an employee task status request
+ */
+export const ApproveTaskStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApproveTaskStatusBody = zod.object({
+  "approved": zod.boolean(),
+  "reason": zod.string().optional()
+})
+
+export const ApproveTaskStatusResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
@@ -747,6 +886,7 @@ export const GetOverdueTasksResponseItem = zod.object({
   "title": zod.string(),
   "description": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
@@ -773,7 +913,7 @@ export const GetRecentActivityQueryParams = zod.object({
 
 export const GetRecentActivityResponseItem = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['task_created', 'task_completed', 'task_delayed', 'kpi_updated', 'kra_scored', 'employee_added']),
+  "type": zod.enum(['task_created', 'task_completed', 'task_delayed', 'kpi_updated', 'kra_scored', 'employee_added', 'kra_submitted', 'kra_approved', 'kra_rejected', 'task_status_requested', 'task_status_approved', 'task_status_rejected']),
   "description": zod.string(),
   "actorName": zod.string(),
   "entityId": zod.number().nullish(),
@@ -781,5 +921,69 @@ export const GetRecentActivityResponseItem = zod.object({
   "createdAt": zod.string()
 })
 export const GetRecentActivityResponse = zod.array(GetRecentActivityResponseItem)
+
+
+/**
+ * @summary Get employee-specific dashboard summary
+ */
+export const GetEmployeeDashboardSummaryQueryParams = zod.object({
+  "employeeId": zod.coerce.number()
+})
+
+export const GetEmployeeDashboardSummaryResponse = zod.object({
+  "myTasks": zod.number(),
+  "completedTasks": zod.number(),
+  "pendingTasks": zod.number(),
+  "overdueTasks": zod.number(),
+  "myKpiScore": zod.number().nullable(),
+  "myKpiRating": zod.string().nullable(),
+  "myKraAvg": zod.number().nullable(),
+  "taskBreakdown": zod.array(zod.object({
+  "status": zod.string(),
+  "count": zod.number()
+})),
+  "recentActivity": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['task_created', 'task_completed', 'task_delayed', 'kpi_updated', 'kra_scored', 'employee_added', 'kra_submitted', 'kra_approved', 'kra_rejected', 'task_status_requested', 'task_status_approved', 'task_status_rejected']),
+  "description": zod.string(),
+  "actorName": zod.string(),
+  "entityId": zod.number().nullish(),
+  "entityType": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get pending KRA closures and task status requests (manager/HOD)
+ */
+export const GetPendingApprovalsQueryParams = zod.object({
+  "departmentId": zod.coerce.number().optional(),
+  "approverId": zod.coerce.number().optional(),
+  "role": zod.coerce.string().optional()
+})
+
+export const GetPendingApprovalsResponse = zod.object({
+  "kras": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "employeeId": zod.number(),
+  "employeeName": zod.string(),
+  "departmentName": zod.string(),
+  "achievementPct": zod.number().nullish(),
+  "kraStatus": zod.string(),
+  "submittedAt": zod.string().nullish()
+})),
+  "tasks": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "assignedToId": zod.number(),
+  "assignedToName": zod.string(),
+  "departmentName": zod.string(),
+  "status": zod.string(),
+  "requestedStatus": zod.string(),
+  "progressPct": zod.number().optional()
+}))
+})
 
 

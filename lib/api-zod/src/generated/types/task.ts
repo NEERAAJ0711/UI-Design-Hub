@@ -15,6 +15,8 @@ export interface Task {
   /** @nullable */
   description?: string | null;
   status: TaskStatus;
+  /** @nullable */
+  requestedStatus?: string | null;
   priority: TaskPriority;
   /** @nullable */
   dueDate?: string | null;

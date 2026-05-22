@@ -16,4 +16,10 @@ export const ActivityItemType = {
   kpi_updated: 'kpi_updated',
   kra_scored: 'kra_scored',
   employee_added: 'employee_added',
+  kra_submitted: 'kra_submitted',
+  kra_approved: 'kra_approved',
+  kra_rejected: 'kra_rejected',
+  task_status_requested: 'task_status_requested',
+  task_status_approved: 'task_status_approved',
+  task_status_rejected: 'task_status_rejected',
 } as const;

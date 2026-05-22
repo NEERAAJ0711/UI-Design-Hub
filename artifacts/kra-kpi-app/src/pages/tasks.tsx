@@ -7,12 +7,16 @@ import {
   useUpdateTask,
   useDeleteTask,
   useUpdateTaskStatus,
+  useRequestTaskStatus,
+  useApproveTaskStatus,
   useGetTask,
   useListTaskComments,
   useAddTaskComment,
+  useGetPendingApprovals,
   getListTasksQueryKey,
   getGetTaskQueryKey,
   getListTaskCommentsQueryKey,
+  getGetPendingApprovalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,14 +35,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, MoreHorizontal, Pencil, Trash2, MessageSquare, CheckCircle, RefreshCw, Repeat } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, MessageSquare, RefreshCw, Repeat, CheckCircle2, XCircle, Bell, Clock, Send } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useAuth } from "@/contexts/auth-context";
 
 const STATUSES = ["pending", "in_progress", "completed", "delayed", "approved", "rejected"] as const;
+const EMPLOYEE_REQUESTABLE = ["in_progress", "completed", "delayed"] as const;
 const PRIORITIES = ["high", "medium", "low"] as const;
 const FREQS = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
 
@@ -74,22 +80,206 @@ const commentSchema = z.object({ authorId: z.number({ required_error: "Author re
 type CommentForm = z.infer<typeof commentSchema>;
 
 type TaskRow = {
-  id: number; title: string; description?: string | null; status: string; priority: string; dueDate?: string | null;
+  id: number; title: string; description?: string | null; status: string; requestedStatus?: string | null; priority: string; dueDate?: string | null;
   assignedToId: number; assignedToName?: string | null; createdById: number; createdByName?: string | null;
   departmentId: number; departmentName?: string | null; isRecurring?: boolean | null; recurringFreq?: string | null; progressPct?: number | null; createdAt: string;
 };
 
 export default function Tasks() {
+  const { user } = useAuth();
+  if (user?.role === "employee") return <EmployeeTasks />;
+  return <FullTasks />;
+}
+
+// ── Employee View ─────────────────────────────────────────────────────────────
+function EmployeeTasks() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: tasks, isLoading } = useListTasks(
+    { assignedToId: user!.id },
+    { query: { queryKey: getListTasksQueryKey({ assignedToId: user!.id }) } }
+  );
+  const { data: employees } = useListEmployees();
+  const requestStatus = useRequestTaskStatus();
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [requestStatusDialog, setRequestStatusDialog] = useState<{ id: number; title: string } | null>(null);
+  const [requestedNewStatus, setRequestedNewStatus] = useState<string>("in_progress");
+  const [progressInput, setProgressInput] = useState(0);
+
+  const filtered = tasks?.filter((t) => filterStatus === "all" || t.status === filterStatus);
+
+  function submitStatusRequest() {
+    if (!requestStatusDialog) return;
+    requestStatus.mutate({ id: requestStatusDialog.id, data: { status: requestedNewStatus as typeof EMPLOYEE_REQUESTABLE[number], progressPct: progressInput } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ assignedToId: user!.id }) });
+        setRequestStatusDialog(null);
+        toast({ title: "Status change requested — awaiting manager approval." });
+      },
+    });
+  }
+
+  return (
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">My Tasks</h2>
+        <p className="text-muted-foreground">Tasks assigned to you. Request status updates for manager approval.</p>
+      </div>
+
+      <div className="flex gap-3">
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Task</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {[250, 100, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                  </TableRow>
+                ))
+              ) : filtered?.length ? (
+                filtered.map((task) => (
+                  <TableRow key={task.id} className="cursor-pointer" onClick={() => setDetailId(task.id)}>
+                    <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          {task.isRecurring && <Repeat className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                          <button className="text-left hover:underline font-medium" onClick={() => setDetailId(task.id)}>{task.title}</button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{task.departmentName}</div>
+                        {task.requestedStatus && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Clock className="h-3 w-3 text-orange-500" />
+                            <span className="text-xs text-orange-600 font-medium">Pending: {task.requestedStatus.replace("_", " ")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[task.status] ?? ""}`}>
+                        {task.status.replace("_", " ")}
+                      </span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[task.priority] ?? ""}`}>
+                        {task.priority}
+                      </span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <Progress value={task.progressPct} className="w-20 h-1.5" />
+                        <span className="text-xs text-muted-foreground">{task.progressPct}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()} className="text-sm">
+                      {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—"}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setDetailId(task.id)}>
+                            <MessageSquare className="mr-2 h-4 w-4" /> View & Comments
+                          </DropdownMenuItem>
+                          {!task.requestedStatus && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => { setRequestStatusDialog({ id: task.id, title: task.title }); setRequestedNewStatus("in_progress"); setProgressInput(task.progressPct ?? 0); }}>
+                                <Send className="mr-2 h-4 w-4" /> Request Status Change
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {detailId && (
+        <TaskDetailSheet taskId={detailId} employees={employees ?? []} onClose={() => setDetailId(null)} onStatusChange={() => {}} readOnly />
+      )}
+
+      <Dialog open={!!requestStatusDialog} onOpenChange={(open) => !open && setRequestStatusDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Request Status Change</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground mb-3">{requestStatusDialog?.title}</p>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">New Status</Label>
+              <Select value={requestedNewStatus} onValueChange={setRequestedNewStatus}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EMPLOYEE_REQUESTABLE.map((s) => <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Progress % (optional)</Label>
+              <Input type="number" min={0} max={100} value={progressInput} onChange={(e) => setProgressInput(Number(e.target.value))} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setRequestStatusDialog(null)}>Cancel</Button>
+            <Button onClick={submitStatusRequest} disabled={requestStatus.isPending}>Submit Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Full Tasks View (Manager/HOD/Management) ────────────────────────────────
+function FullTasks() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: tasks, isLoading } = useListTasks();
+  const deptFilter = user?.role === "hod" ? { departmentId: user.departmentId ?? undefined } : {};
+  const approvalParams = { departmentId: user?.departmentId ?? undefined, role: user?.role };
+
+  const { data: tasks, isLoading } = useListTasks(deptFilter, { query: { queryKey: getListTasksQueryKey(deptFilter) } });
+  const { data: pendingData } = useGetPendingApprovals(approvalParams);
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
+
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const updateStatus = useUpdateTaskStatus();
+  const approveStatus = useApproveTaskStatus();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<TaskRow | null>(null);
@@ -104,6 +294,9 @@ export default function Tasks() {
     defaultValues: { title: "", description: "", priority: "medium", dueDate: "", isRecurring: false },
   });
   const isRecurring = form.watch("isRecurring");
+
+  const pendingTaskApprovals = pendingData?.tasks ?? [];
+  const canManage = user?.role !== "employee";
 
   function openCreate() {
     setEditTarget(null);
@@ -128,27 +321,14 @@ export default function Tasks() {
   }
 
   function onSubmit(values: TaskFormData) {
-    const payload = {
-      ...values,
-      description: values.description || undefined,
-      dueDate: values.dueDate || undefined,
-      recurringFreq: values.isRecurring ? values.recurringFreq : undefined,
-    };
+    const payload = { ...values, description: values.description || undefined, dueDate: values.dueDate || undefined, recurringFreq: values.isRecurring ? values.recurringFreq : undefined };
     if (editTarget) {
       updateTask.mutate({ id: editTarget.id, data: payload }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          setDialogOpen(false);
-          toast({ title: "Task updated" });
-        },
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "Task updated" }); },
       });
     } else {
       createTask.mutate({ data: payload }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          setDialogOpen(false);
-          toast({ title: "Task created" });
-        },
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "Task created" }); },
       });
     }
   }
@@ -156,9 +336,19 @@ export default function Tasks() {
   function changeStatus(taskId: number, status: string) {
     updateStatus.mutate({ id: taskId, data: { status: status as typeof STATUSES[number] } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) });
         if (detailId === taskId) queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
         toast({ title: `Status updated to ${status.replace("_", " ")}` });
+      },
+    });
+  }
+
+  function handleTaskApproval(id: number, approved: boolean) {
+    approveStatus.mutate({ id, data: { approved } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) });
+        queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
+        toast({ title: approved ? "Status change approved" : "Status change rejected" });
       },
     });
   }
@@ -166,11 +356,7 @@ export default function Tasks() {
   function confirmDelete() {
     if (!deleteTarget) return;
     deleteTask.mutate({ id: deleteTarget.id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-        setDeleteTarget(null);
-        toast({ title: "Task deleted" });
-      },
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDeleteTarget(null); toast({ title: "Task deleted" }); },
     });
   }
 
@@ -188,12 +374,47 @@ export default function Tasks() {
           <h2 className="text-3xl font-bold tracking-tight">Tasks</h2>
           <p className="text-muted-foreground">Track deliverables, assignments, and due dates.</p>
         </div>
-        <Button data-testid="button-create-task" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Create Task
-        </Button>
+        {canManage && (
+          <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Create Task</Button>
+        )}
       </div>
 
-      {/* Filters */}
+      {/* Pending Approvals */}
+      {pendingTaskApprovals.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4 text-orange-500" /> {pendingTaskApprovals.length} Pending Status Request{pendingTaskApprovals.length > 1 ? "s" : ""}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {pendingTaskApprovals.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                  <div>
+                    <p className="text-sm font-medium">{t.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-muted-foreground">{t.assignedToName}</p>
+                      <span className="text-xs text-muted-foreground">Current: <strong>{t.status}</strong></span>
+                      <span className="text-xs">→</span>
+                      <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{t.requestedStatus}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-3">
+                    <Button size="sm" variant="outline" className="text-green-600 border-green-200 h-7 px-2" onClick={() => handleTaskApproval(t.id, true)}>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600 border-red-200 h-7 px-2" onClick={() => handleTaskApproval(t.id, false)}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
@@ -209,13 +430,15 @@ export default function Tasks() {
             {PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={filterDept} onValueChange={setFilterDept}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {user?.role !== "hod" && (
+          <Select value={filterDept} onValueChange={setFilterDept}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <Card>
@@ -236,32 +459,24 @@ export default function Tasks() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[250, 120, 80, 80, 120, 100, 50].map((w, j) => (
-                      <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>
-                    ))}
+                    {[250, 120, 80, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                   </TableRow>
                 ))
               ) : filtered?.length ? (
                 filtered.map((task) => (
-                  <TableRow
-                    key={task.id}
-                    className="cursor-pointer"
-                    data-testid={`row-task-${task.id}`}
-                    onClick={() => setDetailId(task.id)}
-                  >
+                  <TableRow key={task.id} className="cursor-pointer" onClick={() => setDetailId(task.id)}>
                     <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                       <div>
                         <div className="flex items-center gap-1.5">
                           {task.isRecurring && <Repeat className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                          <button
-                            className="text-left hover:underline font-medium"
-                            onClick={() => setDetailId(task.id)}
-                            data-testid={`link-task-${task.id}`}
-                          >
-                            {task.title}
-                          </button>
+                          <button className="text-left hover:underline font-medium" onClick={() => setDetailId(task.id)}>{task.title}</button>
                         </div>
                         <div className="text-xs text-muted-foreground">{task.departmentName}</div>
+                        {task.requestedStatus && (
+                          <span className="text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                            Pending: {task.requestedStatus.replace("_", " ")}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{task.assignedToName}</TableCell>
@@ -287,9 +502,7 @@ export default function Tasks() {
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" data-testid={`button-actions-task-${task.id}`}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setDetailId(task.id)}>
@@ -315,9 +528,7 @@ export default function Tasks() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    No tasks found.
-                  </TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -325,142 +536,87 @@ export default function Tasks() {
         </CardContent>
       </Card>
 
-      {/* Task Detail Sheet */}
       {detailId && (
-        <TaskDetailSheet
-          taskId={detailId}
-          employees={employees ?? []}
-          onClose={() => setDetailId(null)}
-          onStatusChange={changeStatus}
-        />
+        <TaskDetailSheet taskId={detailId} employees={employees ?? []} onClose={() => setDetailId(null)} onStatusChange={changeStatus} />
       )}
 
-      {/* Create / Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editTarget ? "Edit Task" : "Create Task"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editTarget ? "Edit Task" : "Create Task"}</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="title" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl><Input data-testid="input-task-title" placeholder="Task title" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
+                <FormItem><FormLabel>Title</FormLabel><FormControl><Input placeholder="Task title" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl><Textarea placeholder="Describe the task..." rows={3} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
+                <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the task..." rows={3} {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="priority" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Priority</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger data-testid="select-task-priority"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem><FormLabel>Priority</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Date</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="assignedToId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assign To</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                      <FormControl><SelectTrigger data-testid="select-task-assignee"><SelectValue placeholder="Select employee" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem><FormLabel>Assign To</FormLabel>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger></FormControl>
+                      <SelectContent>{employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="createdById" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Created By</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select creator" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem><FormLabel>Created By</FormLabel>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select creator" /></SelectTrigger></FormControl>
+                      <SelectContent>{employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="departmentId" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Department</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                      <FormControl><SelectTrigger data-testid="select-task-department"><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem className="col-span-2"><FormLabel>Department</FormLabel>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                      <SelectContent>{departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
                   </FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="isRecurring" render={({ field }) => (
                 <FormItem className="flex items-center gap-3 rounded-lg border p-3">
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} id="is-recurring" />
-                  </FormControl>
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} id="is-recurring" /></FormControl>
                   <Label htmlFor="is-recurring" className="cursor-pointer">Recurring Task</Label>
                 </FormItem>
               )} />
               {isRecurring && (
                 <FormField control={form.control} name="recurringFreq" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Frequency</FormLabel>
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {FREQS.map((f) => <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem><FormLabel>Frequency</FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                      <SelectContent>{FREQS.map((f) => <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
                   </FormItem>
                 )} />
               )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" data-testid="button-submit-task" disabled={createTask.isPending || updateTask.isPending}>
-                  {editTarget ? "Save Changes" : "Create Task"}
-                </Button>
+                <Button type="submit" disabled={createTask.isPending || updateTask.isPending}>{editTarget ? "Save Changes" : "Create Task"}</Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete task?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{deleteTarget?.title}</strong>.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Permanently delete <strong>{deleteTarget?.title}</strong>?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -470,16 +626,15 @@ export default function Tasks() {
 
 // ── Task Detail Sheet ─────────────────────────────────────────────────────────
 function TaskDetailSheet({
-  taskId,
-  employees,
-  onClose,
-  onStatusChange,
+  taskId, employees, onClose, onStatusChange, readOnly = false,
 }: {
   taskId: number;
   employees: { id: number; name: string }[];
   onClose: () => void;
   onStatusChange: (id: number, status: string) => void;
+  readOnly?: boolean;
 }) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: task, isLoading } = useGetTask(taskId, { query: { queryKey: getGetTaskQueryKey(taskId) } });
@@ -488,14 +643,14 @@ function TaskDetailSheet({
 
   const commentForm = useForm<CommentForm>({
     resolver: zodResolver(commentSchema),
-    defaultValues: { content: "" },
+    defaultValues: { content: "", authorId: user?.id },
   });
 
   function submitComment(values: CommentForm) {
     addComment.mutate({ id: taskId, data: values }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListTaskCommentsQueryKey(taskId) });
-        commentForm.reset({ content: "", authorId: values.authorId });
+        commentForm.reset({ content: "", authorId: user?.id });
         toast({ title: "Comment added" });
       },
     });
@@ -504,14 +659,9 @@ function TaskDetailSheet({
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Task Detail</SheetTitle>
-        </SheetHeader>
+        <SheetHeader><SheetTitle>Task Detail</SheetTitle></SheetHeader>
         {isLoading ? (
-          <div className="space-y-4 mt-4">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-20 w-full" />
-          </div>
+          <div className="space-y-4 mt-4"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-20 w-full" /></div>
         ) : task ? (
           <div className="mt-4 space-y-5">
             <div>
@@ -525,37 +675,39 @@ function TaskDetailSheet({
                 <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
               </div>
               <div><span className="text-muted-foreground">Due:</span> <span className="font-medium">{task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—"}</span></div>
-              <div><span className="text-muted-foreground">Progress:</span> <span className="font-medium">{task.progressPct}%</span></div>
-              {task.isRecurring && <div><span className="text-muted-foreground">Recurring:</span> <span className="font-medium capitalize">{task.recurringFreq}</span></div>}
+              <div><span className="text-muted-foreground">Status:</span>
+                <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[task.status] ?? ""}`}>{task.status.replace("_", " ")}</span>
+              </div>
+              {task.requestedStatus && (
+                <div><span className="text-muted-foreground">Requested:</span>
+                  <span className="ml-1.5 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Pending: {task.requestedStatus.replace("_", " ")}</span>
+                </div>
+              )}
             </div>
             <div>
               <div className="text-sm text-muted-foreground mb-1">Progress</div>
-              <Progress value={task.progressPct} className="h-2" />
-            </div>
-            <div>
-              <div className="text-sm font-medium mb-2">Update Status</div>
-              <div className="flex flex-wrap gap-2">
-                {STATUSES.map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={task.status === s ? "default" : "outline"}
-                    className="capitalize text-xs"
-                    onClick={() => onStatusChange(taskId, s)}
-                    data-testid={`button-status-${s}`}
-                  >
-                    {s.replace("_", " ")}
-                  </Button>
-                ))}
+              <div className="flex items-center gap-2">
+                <Progress value={task.progressPct} className="flex-1 h-2" />
+                <span className="text-sm font-medium">{task.progressPct}%</span>
               </div>
             </div>
-
-            {/* Comments */}
+            {!readOnly && (
+              <div>
+                <div className="text-sm font-medium mb-2">Update Status</div>
+                <div className="flex flex-wrap gap-2">
+                  {STATUSES.map((s) => (
+                    <Button key={s} size="sm" variant={task.status === s ? "default" : "outline"} className="capitalize text-xs" onClick={() => onStatusChange(taskId, s)}>
+                      {s.replace("_", " ")}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="border-t pt-4">
               <h4 className="text-sm font-semibold mb-3">Comments ({comments?.length ?? 0})</h4>
               <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                 {comments?.map((c) => (
-                  <div key={c.id} className="bg-muted rounded-lg p-3 text-sm" data-testid={`comment-${c.id}`}>
+                  <div key={c.id} className="bg-muted rounded-lg p-3 text-sm">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium">{c.authorName}</span>
                       <span className="text-xs text-muted-foreground">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
@@ -567,33 +719,26 @@ function TaskDetailSheet({
               </div>
               <Form {...commentForm}>
                 <form onSubmit={commentForm.handleSubmit(submitComment)} className="space-y-2">
-                  <FormField control={commentForm.control} name="authorId" render={({ field }) => (
-                    <FormItem>
-                      <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                        <FormControl><SelectTrigger className="text-sm" data-testid="select-comment-author"><SelectValue placeholder="Your name" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {employees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  {!user && (
+                    <FormField control={commentForm.control} name="authorId" render={({ field }) => (
+                      <FormItem>
+                        <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
+                          <SelectTrigger><SelectValue placeholder="Comment as..." /></SelectTrigger>
+                          <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                  )}
                   <FormField control={commentForm.control} name="content" render={({ field }) => (
-                    <FormItem>
-                      <FormControl><Textarea placeholder="Write a comment..." rows={2} data-testid="input-comment-content" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <FormItem><FormControl><Textarea placeholder="Add a comment..." rows={2} {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <Button type="submit" size="sm" disabled={addComment.isPending} data-testid="button-submit-comment">
-                    Add Comment
-                  </Button>
+                  <Button type="submit" size="sm" disabled={addComment.isPending}>Post Comment</Button>
                 </form>
               </Form>
             </div>
           </div>
-        ) : null}
+        ) : <p className="text-sm text-muted-foreground mt-4">Task not found.</p>}
       </SheetContent>
     </Sheet>
   );
 }
-
