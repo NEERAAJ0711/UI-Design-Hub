@@ -9,6 +9,52 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Login with email and password
+ */
+
+
+
+export const LoginBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string().min(1)
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['management', 'hod', 'manager', 'employee']),
+  "designation": zod.string().nullish(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().nullish(),
+  "managerId": zod.number().nullish()
+})
+
+
+/**
+ * @summary Get current authenticated user
+ */
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['management', 'hod', 'manager', 'employee']),
+  "designation": zod.string().nullish(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().nullish(),
+  "managerId": zod.number().nullish()
+})
+
+
+/**
+ * @summary Logout current session
+ */
+export const LogoutResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({

@@ -5,6 +5,40 @@
  * KRA, KPI & Task Management System API
  * OpenAPI spec version: 0.1.0
  */
+export interface LoginInput {
+  email: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export type CurrentUserRole = typeof CurrentUserRole[keyof typeof CurrentUserRole];
+
+
+export const CurrentUserRole = {
+  management: 'management',
+  hod: 'hod',
+  manager: 'manager',
+  employee: 'employee',
+} as const;
+
+export interface CurrentUser {
+  id: number;
+  name: string;
+  email: string;
+  role: CurrentUserRole;
+  /** @nullable */
+  designation?: string | null;
+  departmentId: number;
+  /** @nullable */
+  departmentName?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+}
+
+export interface ErrorResponse {
+  error: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -424,6 +458,10 @@ export interface ActivityItem {
   entityType?: string | null;
   createdAt: string;
 }
+
+export type Logout200 = {
+  ok?: boolean;
+};
 
 export type ListEmployeesParams = {
 departmentId?: number;

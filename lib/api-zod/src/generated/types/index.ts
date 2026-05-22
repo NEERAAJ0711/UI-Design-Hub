@@ -8,6 +8,8 @@
 
 export * from './activityItem';
 export * from './activityItemType';
+export * from './currentUser';
+export * from './currentUserRole';
 export * from './dashboardSummary';
 export * from './department';
 export * from './departmentInput';
@@ -20,6 +22,7 @@ export * from './employeePerformance';
 export * from './employeeRole';
 export * from './employeeUpdate';
 export * from './employeeUpdateRole';
+export * from './errorResponse';
 export * from './getRecentActivityParams';
 export * from './getTopPerformersParams';
 export * from './healthStatus';
@@ -37,6 +40,8 @@ export * from './listEmployeesParams';
 export * from './listKpisParams';
 export * from './listKrasParams';
 export * from './listTasksParams';
+export * from './loginInput';
+export * from './logout200';
 export * from './task';
 export * from './taskComment';
 export * from './taskCommentInput';

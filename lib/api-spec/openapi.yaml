@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
   - name: departments
     description: Department management
   - name: employees
@@ -23,6 +25,66 @@ tags:
     description: Dashboard & analytics
 
 paths:
+  # ── Auth ──────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
   /healthz:
     get:
       operationId: healthCheck
@@ -729,6 +791,32 @@ paths:
 
 components:
   schemas:
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, minLength: 1 }
+
+    CurrentUser:
+      type: object
+      required: [id, name, email, role, departmentId]
+      properties:
+        id:             { type: integer }
+        name:           { type: string }
+        email:          { type: string }
+        role:           { type: string, enum: [management, hod, manager, employee] }
+        designation:    { type: ["string", "null"] }
+        departmentId:   { type: integer }
+        departmentName: { type: ["string", "null"] }
+        managerId:      { type: ["integer", "null"] }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
     HealthStatus:
       type: object
       required: [status]

@@ -6,6 +6,7 @@ export const employeesTable = pgTable("employees", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
   role: text("role").notNull().default("employee"), // management | hod | manager | employee
   designation: text("designation"),
   departmentId: integer("department_id").notNull(),
