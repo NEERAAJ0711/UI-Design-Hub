@@ -1,0 +1,149 @@
+import { Router } from "express";
+import { db, tasksTable, employeesTable, departmentsTable, kpisTable, activityLogTable } from "@workspace/db";
+import { eq, count, sql, lt } from "drizzle-orm";
+
+const router = Router();
+
+function calcRating(score: number): string {
+  if (score >= 90) return "Outstanding";
+  if (score >= 80) return "Very Good";
+  if (score >= 70) return "Good";
+  if (score >= 60) return "Average";
+  return "Improvement Required";
+}
+
+router.get("/dashboard/summary", async (req, res) => {
+  const [empCount] = await db.select({ count: count() }).from(employeesTable);
+  const [deptCount] = await db.select({ count: count() }).from(departmentsTable);
+  const [totalTasks] = await db.select({ count: count() }).from(tasksTable);
+  const [completedTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "completed"));
+  const [pendingTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "pending"));
+  const [delayedTasks] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "delayed"));
+  const [pendingApprovals] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.status, "in_progress"));
+
+  const kpiScores = await db.select({ score: kpisTable.totalScore }).from(kpisTable);
+  const avgKpiScore = kpiScores.length
+    ? kpiScores.reduce((sum, k) => sum + k.score, 0) / kpiScores.length
+    : 0;
+
+  res.json({
+    totalEmployees: Number(empCount.count),
+    totalDepartments: Number(deptCount.count),
+    totalTasks: Number(totalTasks.count),
+    completedTasks: Number(completedTasks.count),
+    pendingTasks: Number(pendingTasks.count),
+    delayedTasks: Number(delayedTasks.count),
+    avgKpiScore: Math.round(avgKpiScore * 10) / 10,
+    pendingApprovals: Number(pendingApprovals.count),
+  });
+});
+
+router.get("/dashboard/department-performance", async (req, res) => {
+  const depts = await db.select().from(departmentsTable);
+  const employees = await db.select().from(employeesTable);
+  const tasks = await db.select().from(tasksTable);
+  const kpis = await db.select().from(kpisTable);
+
+  const empByDept = new Map<number, number[]>();
+  for (const emp of employees) {
+    if (!empByDept.has(emp.departmentId)) empByDept.set(emp.departmentId, []);
+    empByDept.get(emp.departmentId)!.push(emp.id);
+  }
+
+  const result = depts.map((dept) => {
+    const empIds = empByDept.get(dept.id) ?? [];
+    const deptTasks = tasks.filter((t) => t.departmentId === dept.id);
+    const deptKpis = kpis.filter((k) => empIds.includes(k.employeeId));
+
+    const completedCount = deptTasks.filter((t) => t.status === "completed").length;
+    const delayedCount = deptTasks.filter((t) => t.status === "delayed").length;
+    const completionRate = deptTasks.length ? (completedCount / deptTasks.length) * 100 : 0;
+    const avgKpi = deptKpis.length ? deptKpis.reduce((s, k) => s + k.totalScore, 0) / deptKpis.length : 0;
+
+    return {
+      departmentId: dept.id,
+      departmentName: dept.name,
+      employeeCount: empIds.length,
+      avgKpiScore: Math.round(avgKpi * 10) / 10,
+      taskCompletionRate: Math.round(completionRate * 10) / 10,
+      delayedTaskCount: delayedCount,
+    };
+  });
+
+  res.json(result);
+});
+
+router.get("/dashboard/task-status-breakdown", async (req, res) => {
+  const rows = await db
+    .select({ status: tasksTable.status, count: count() })
+    .from(tasksTable)
+    .groupBy(tasksTable.status);
+
+  res.json(rows.map((r) => ({ status: r.status, count: Number(r.count) })));
+});
+
+router.get("/dashboard/top-performers", async (req, res) => {
+  const limit = Number(req.query.limit) || 5;
+  const kpis = await db.select().from(kpisTable).orderBy(sql`${kpisTable.totalScore} DESC`).limit(limit);
+
+  const emps = await db.select().from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e]));
+  const depts = await db.select().from(departmentsTable);
+  const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+  const allTasks = await db.select().from(tasksTable);
+
+  const result = await Promise.all(kpis.map(async (k) => {
+    const emp = empMap.get(k.employeeId);
+    const empTasks = allTasks.filter((t) => t.assignedToId === k.employeeId && t.status === "completed");
+    return {
+      employeeId: k.employeeId,
+      employeeName: emp?.name ?? "",
+      departmentName: deptMap.get(emp?.departmentId ?? 0) ?? "",
+      kpiScore: Math.round(k.totalScore * 10) / 10,
+      rating: calcRating(k.totalScore),
+      tasksCompleted: empTasks.length,
+    };
+  }));
+
+  res.json(result);
+});
+
+router.get("/dashboard/overdue-tasks", async (req, res) => {
+  const today = new Date().toISOString().split("T")[0];
+  const tasks = await db.select().from(tasksTable);
+  const overdue = tasks.filter((t) =>
+    t.dueDate && t.dueDate < today && t.status !== "completed" && t.status !== "approved"
+  );
+
+  const emps = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e.name]));
+  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
+  const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+
+  res.json(overdue.map((t) => ({
+    ...t,
+    assignedToName: empMap.get(t.assignedToId) ?? "",
+    createdByName: empMap.get(t.createdById) ?? "",
+    departmentName: deptMap.get(t.departmentId) ?? "",
+    completedAt: t.completedAt?.toISOString() ?? null,
+    createdAt: t.createdAt.toISOString(),
+  })));
+});
+
+router.get("/dashboard/recent-activity", async (req, res) => {
+  const limit = Number(req.query.limit) || 10;
+  const activities = await db.select().from(activityLogTable)
+    .orderBy(sql`${activityLogTable.createdAt} DESC`)
+    .limit(limit);
+
+  const emps = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e.name]));
+
+  res.json(activities.map((a) => ({
+    ...a,
+    actorName: a.actorId ? (empMap.get(a.actorId) ?? "System") : "System",
+    createdAt: a.createdAt.toISOString(),
+  })));
+});
+
+export default router;

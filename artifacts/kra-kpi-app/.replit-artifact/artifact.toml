@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "KRA & KPI Management System"
+version = "1.0.0"
+id = "artifacts/kra-kpi-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22778
+
+[services.development]
+run = "pnpm --filter @workspace/kra-kpi-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kra-kpi-app", "run", "build" ]
+publicDir = "artifacts/kra-kpi-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22778"
+BASE_PATH = "/"
