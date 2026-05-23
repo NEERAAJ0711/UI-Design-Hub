@@ -13,6 +13,7 @@ import {
   UserCircle,
   ShieldAlert,
   Settings,
+  FileBarChart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,7 @@ const MAIN_NAV = [
   { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ALL_ROLES },
   { name: "KRAs", href: "/kras", icon: Target, roles: ALL_ROLES },
   { name: "KPIs", href: "/kpis", icon: BarChart, roles: ["admin", "management", "hod", "manager"] },
+  { name: "Reports", href: "/reports", icon: FileBarChart, roles: ["admin", "management", "hod", "manager"] },
 ];
 
 const ADMIN_NAV = [

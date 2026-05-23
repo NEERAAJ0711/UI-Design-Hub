@@ -27,11 +27,45 @@ import { useToast } from "@/hooks/use-toast";
 
 const ROLES = ["management", "hod", "manager", "employee"] as const;
 
+const DESIGNATIONS = [
+  "Chief Executive Officer",
+  "Chief Operating Officer",
+  "Chief Financial Officer",
+  "Chief Technology Officer",
+  "Vice President",
+  "General Manager",
+  "Deputy General Manager",
+  "Assistant General Manager",
+  "Senior Manager",
+  "Manager",
+  "Assistant Manager",
+  "Team Lead",
+  "Senior Engineer",
+  "Engineer",
+  "Junior Engineer",
+  "Senior Analyst",
+  "Analyst",
+  "Senior Executive",
+  "Executive",
+  "Coordinator",
+  "Intern",
+] as const;
+
+const COMPANIES = [
+  "Acme Group",
+  "Acme Technologies",
+  "Acme Industries",
+  "Acme Services",
+  "Acme Finance",
+  "Acme Retail",
+] as const;
+
 const empSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email required"),
   role: z.enum(ROLES),
   designation: z.string().optional(),
+  company: z.string().optional(),
   departmentId: z.number({ required_error: "Department required" }),
   managerId: z.number().optional(),
   phone: z.string().optional(),
@@ -68,12 +102,12 @@ export default function Employees() {
 
   const form = useForm<EmpForm>({
     resolver: zodResolver(empSchema),
-    defaultValues: { name: "", email: "", role: "employee", designation: "", phone: "", joiningDate: "" },
+    defaultValues: { name: "", email: "", role: "employee", designation: "", company: "", phone: "", joiningDate: "" },
   });
 
   function openCreate() {
     setEditTarget(null);
-    form.reset({ name: "", email: "", role: "employee", designation: "", phone: "", joiningDate: "" });
+    form.reset({ name: "", email: "", role: "employee", designation: "", company: "", phone: "", joiningDate: "" });
     setDialogOpen(true);
   }
 
@@ -84,6 +118,7 @@ export default function Employees() {
       email: emp.email,
       role: emp.role as typeof ROLES[number],
       designation: emp.designation ?? "",
+      company: (emp as Employee & { company?: string | null }).company ?? "",
       departmentId: emp.departmentId,
       managerId: emp.managerId ?? undefined,
       phone: emp.phone ?? "",
@@ -96,6 +131,7 @@ export default function Employees() {
     const payload = {
       ...values,
       designation: values.designation || undefined,
+      company: values.company || undefined,
       managerId: values.managerId || undefined,
       phone: values.phone || undefined,
       joiningDate: values.joiningDate || undefined,
@@ -289,7 +325,34 @@ export default function Employees() {
                 <FormField control={form.control} name="designation" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Designation</FormLabel>
-                    <FormControl><Input placeholder="e.g. Software Engineer" {...field} /></FormControl>
+                    <Select value={field.value ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select designation" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {DESIGNATIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="company" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company</FormLabel>
+                    <Select value={field.value ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {COMPANIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />

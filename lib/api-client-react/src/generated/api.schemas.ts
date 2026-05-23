@@ -29,6 +29,8 @@ export interface CurrentUser {
   role: CurrentUserRole;
   /** @nullable */
   designation?: string | null;
+  /** @nullable */
+  company?: string | null;
   departmentId: number;
   /** @nullable */
   departmentName?: string | null;
@@ -89,6 +91,8 @@ export interface Employee {
   role: EmployeeRole;
   /** @nullable */
   designation?: string | null;
+  /** @nullable */
+  company?: string | null;
   departmentId: number;
   departmentName: string;
   /** @nullable */
@@ -119,6 +123,7 @@ export interface EmployeeInput {
   email: string;
   role: EmployeeInputRole;
   designation?: string;
+  company?: string;
   departmentId: number;
   managerId?: number;
   phone?: string;
@@ -141,6 +146,7 @@ export interface EmployeeUpdate {
   email?: string;
   role?: EmployeeUpdateRole;
   designation?: string;
+  company?: string;
   departmentId?: number;
   managerId?: number;
   phone?: string;

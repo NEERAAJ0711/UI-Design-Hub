@@ -9,6 +9,7 @@ export const employeesTable = pgTable("employees", {
   passwordHash: text("password_hash"),
   role: text("role").notNull().default("employee"), // management | hod | manager | employee
   designation: text("designation"),
+  company: text("company"),
   departmentId: integer("department_id").notNull(),
   managerId: integer("manager_id"),
   phone: text("phone"),

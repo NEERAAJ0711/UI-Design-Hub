@@ -12,6 +12,7 @@ export interface EmployeeUpdate {
   email?: string;
   role?: EmployeeUpdateRole;
   designation?: string;
+  company?: string;
   departmentId?: number;
   managerId?: number;
   phone?: string;

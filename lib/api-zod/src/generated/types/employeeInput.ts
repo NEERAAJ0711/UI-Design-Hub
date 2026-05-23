@@ -13,6 +13,7 @@ export interface EmployeeInput {
   email: string;
   role: EmployeeInputRole;
   designation?: string;
+  company?: string;
   departmentId: number;
   managerId?: number;
   phone?: string;

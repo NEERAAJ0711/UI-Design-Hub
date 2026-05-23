@@ -14,6 +14,8 @@ export interface Employee {
   role: EmployeeRole;
   /** @nullable */
   designation?: string | null;
+  /** @nullable */
+  company?: string | null;
   departmentId: number;
   departmentName: string;
   /** @nullable */

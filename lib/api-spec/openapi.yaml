@@ -946,6 +946,7 @@ components:
         email:          { type: string }
         role:           { type: string, enum: [admin, management, hod, manager, employee] }
         designation:    { type: ["string", "null"] }
+        company:       { type: ["string", "null"] }
         departmentId:   { type: integer }
         departmentName: { type: ["string", "null"] }
         managerId:      { type: ["integer", "null"] }
@@ -1001,6 +1002,7 @@ components:
         email:          { type: string }
         role:           { type: string, enum: [admin, management, hod, manager, employee] }
         designation:    { type: ["string", "null"] }
+        company:       { type: ["string", "null"] }
         departmentId:   { type: integer }
         departmentName: { type: string }
         managerId:      { type: ["integer", "null"] }
@@ -1017,6 +1019,7 @@ components:
         email:        { type: string }
         role:         { type: string, enum: [admin, management, hod, manager, employee] }
         designation:  { type: string }
+        company:      { type: string }
         departmentId: { type: integer }
         managerId:    { type: integer }
         phone:        { type: string }
@@ -1029,6 +1032,7 @@ components:
         email:        { type: string }
         role:         { type: string, enum: [admin, management, hod, manager, employee] }
         designation:  { type: string }
+        company:      { type: string }
         departmentId: { type: integer }
         managerId:    { type: integer }
         phone:        { type: string }

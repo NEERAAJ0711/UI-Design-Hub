@@ -11,6 +11,7 @@ import Tasks from "@/pages/tasks";
 import KRAs from "@/pages/kras";
 import KPIs from "@/pages/kpis";
 import Admin from "@/pages/admin";
+import Reports from "@/pages/reports";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -58,6 +59,9 @@ function ProtectedRoutes() {
         <Route path="/kras" component={KRAs} />
         {isManagerOrAbove(user.role) && (
           <Route path="/kpis" component={KPIs} />
+        )}
+        {isManagerOrAbove(user.role) && (
+          <Route path="/reports" component={Reports} />
         )}
         {isAdmin(user.role) && (
           <Route path="/admin" component={Admin} />
