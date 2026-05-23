@@ -1253,16 +1253,18 @@ components:
         departmentName: { type: string }
         employeeId:     { type: ["integer", "null"] }
         employeeName:   { type: ["string", "null"] }
-        reviewPeriod:   { type: string, enum: [monthly, quarterly, yearly] }
+        reviewPeriod:     { type: string, enum: [monthly, quarterly, yearly] }
+        frequency:        { type: string, enum: [daily, weekly, bi_weekly, monthly, quarterly, yearly] }
+        dueDate:          { type: ["string", "null"] }
         kraStatus:        { type: string, enum: [active, submitted, manager_approved, approved, rejected] }
         hrApprovalStatus: { type: string, enum: [pending_hr, hr_approved, hr_rejected] }
         submittedAt:      { type: ["string", "null"] }
-        closedAt:       { type: ["string", "null"] }
-        createdAt:      { type: string }
+        closedAt:         { type: ["string", "null"] }
+        createdAt:        { type: string }
 
     KraInput:
       type: object
-      required: [title, weightage, departmentId, reviewPeriod]
+      required: [title, weightage, departmentId, reviewPeriod, frequency]
       properties:
         title:        { type: string, minLength: 1 }
         description:  { type: string }
@@ -1270,6 +1272,8 @@ components:
         departmentId: { type: integer }
         employeeId:   { type: integer }
         reviewPeriod: { type: string, enum: [monthly, quarterly, yearly] }
+        frequency:    { type: string, enum: [daily, weekly, bi_weekly, monthly, quarterly, yearly] }
+        dueDate:      { type: string }
 
     KraUpdate:
       type: object
@@ -1279,6 +1283,8 @@ components:
         weightage:      { type: number }
         achievementPct: { type: number }
         reviewPeriod:   { type: string, enum: [monthly, quarterly, yearly] }
+        frequency:      { type: string, enum: [daily, weekly, bi_weekly, monthly, quarterly, yearly] }
+        dueDate:        { type: string }
         employeeId:     { type: integer }
 
     HrApproveKraInput:

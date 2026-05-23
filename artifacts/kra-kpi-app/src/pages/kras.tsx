@@ -27,7 +27,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle, Bell } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle, Bell, Calendar } from "lucide-react";
+import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,6 +36,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 
 const PERIODS = ["monthly", "quarterly", "yearly"] as const;
+const FREQUENCIES = ["daily", "weekly", "bi_weekly", "monthly", "quarterly", "yearly"] as const;
+const FREQUENCY_LABELS: Record<string, string> = {
+  daily: "Daily", weekly: "Weekly", bi_weekly: "Bi-Weekly",
+  monthly: "Monthly", quarterly: "Quarterly", yearly: "Yearly",
+};
 
 const kraStatusColors: Record<string, string> = {
   active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -63,6 +69,8 @@ const kraSchema = z.object({
   departmentId: z.number({ required_error: "Department required" }),
   employeeId: z.number().optional(),
   reviewPeriod: z.enum(PERIODS),
+  frequency: z.enum(FREQUENCIES),
+  dueDate: z.string().optional(),
 });
 type KraForm = z.infer<typeof kraSchema>;
 
@@ -71,7 +79,8 @@ type ScoreForm = z.infer<typeof scoreSchema>;
 
 type KraRow = {
   id: number; title: string; description?: string | null; weightage: number; achievementPct?: number | null;
-  departmentId: number; departmentName?: string | null; employeeId?: number | null; employeeName?: string | null; reviewPeriod?: string | null;
+  departmentId: number; departmentName?: string | null; employeeId?: number | null; employeeName?: string | null;
+  reviewPeriod?: string | null; frequency?: string | null; dueDate?: string | null;
   kraStatus: string; hrApprovalStatus?: string | null; submittedAt?: string | null; closedAt?: string | null;
 };
 
@@ -237,7 +246,7 @@ function FullKras() {
 
   const form = useForm<KraForm>({
     resolver: zodResolver(kraSchema),
-    defaultValues: { title: "", description: "", weightage: 20, reviewPeriod: "monthly" },
+    defaultValues: { title: "", description: "", weightage: 20, reviewPeriod: "monthly", frequency: "monthly", dueDate: "" },
   });
   const scoreForm = useForm<ScoreForm>({ resolver: zodResolver(scoreSchema), defaultValues: { achievementPct: 0 } });
 
@@ -250,7 +259,7 @@ function FullKras() {
   function openCreate() {
     setEditTarget(null);
     form.reset({
-      title: "", description: "", weightage: 20, reviewPeriod: "monthly",
+      title: "", description: "", weightage: 20, reviewPeriod: "monthly", frequency: "monthly", dueDate: "",
       departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
     });
     setDialogOpen(true);
@@ -264,13 +273,15 @@ function FullKras() {
       weightage: kra.weightage,
       departmentId: kra.departmentId,
       employeeId: kra.employeeId ?? undefined,
-      reviewPeriod: kra.reviewPeriod as typeof PERIODS[number],
+      reviewPeriod: (kra.reviewPeriod ?? "monthly") as typeof PERIODS[number],
+      frequency: (kra.frequency ?? "monthly") as typeof FREQUENCIES[number],
+      dueDate: kra.dueDate ?? "",
     });
     setDialogOpen(true);
   }
 
   function onSubmit(values: KraForm) {
-    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined };
+    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined, dueDate: values.dueDate || undefined };
     if (editTarget) {
       updateKra.mutate({ id: editTarget.id, data: payload }, {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "KRA updated" }); },
@@ -427,7 +438,8 @@ function FullKras() {
                 <TableHead>Title</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Assignee</TableHead>
-                <TableHead>Period</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead>Due Date</TableHead>
                 <TableHead>Weightage</TableHead>
                 <TableHead className="w-[180px]">Achievement</TableHead>
                 <TableHead>Status</TableHead>
@@ -438,7 +450,7 @@ function FullKras() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[200, 120, 120, 80, 60, 180, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                    {[200, 120, 120, 90, 90, 60, 180, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                   </TableRow>
                 ))
               ) : filtered?.length ? (
@@ -457,7 +469,15 @@ function FullKras() {
                         : <span className="text-muted-foreground text-sm italic">Unassigned</span>
                       }
                     </TableCell>
-                    <TableCell className="capitalize">{kra.reviewPeriod}</TableCell>
+                    <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
+                    <TableCell>
+                      {kra.dueDate ? (
+                        <div className={`flex items-center gap-1 text-sm ${kra.dueDate < new Date().toISOString().split("T")[0] && kra.kraStatus !== "approved" ? "text-red-600 font-medium" : ""}`}>
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          {format(new Date(kra.dueDate), "MMM d, yyyy")}
+                        </div>
+                      ) : <span className="text-muted-foreground text-sm">—</span>}
+                    </TableCell>
                     <TableCell>{kra.weightage}%</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -531,6 +551,19 @@ function FullKras() {
                     <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>{PERIODS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
                     </Select><FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="frequency" render={({ field }) => (
+                  <FormItem><FormLabel>Monitoring Frequency</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>{FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="dueDate" render={({ field }) => (
+                  <FormItem><FormLabel>Due Date</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="departmentId" render={({ field }) => (

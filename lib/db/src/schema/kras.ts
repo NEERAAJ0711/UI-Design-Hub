@@ -11,6 +11,8 @@ export const krasTable = pgTable("kras", {
   departmentId: integer("department_id").notNull(),
   employeeId: integer("employee_id"),
   reviewPeriod: text("review_period").notNull().default("monthly"), // monthly | quarterly | yearly
+  frequency: text("frequency").notNull().default("monthly"), // daily | weekly | bi_weekly | monthly | quarterly | yearly
+  dueDate: text("due_date"), // YYYY-MM-DD
   kraStatus: text("kra_status").notNull().default("active"), // active | submitted | manager_approved | approved | rejected
   hrApprovalStatus: text("hr_approval_status").notNull().default("pending_hr"), // pending_hr | hr_approved | hr_rejected
   submittedAt: timestamp("submitted_at", { withTimezone: true }),

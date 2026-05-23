@@ -5,6 +5,7 @@
  * KRA, KPI & Task Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { KraInputFrequency } from './kraInputFrequency';
 import type { KraInputReviewPeriod } from './kraInputReviewPeriod';
 
 export interface KraInput {
@@ -15,4 +16,6 @@ export interface KraInput {
   departmentId: number;
   employeeId?: number;
   reviewPeriod: KraInputReviewPeriod;
+  frequency: KraInputFrequency;
+  dueDate?: string;
 }

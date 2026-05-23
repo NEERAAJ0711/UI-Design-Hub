@@ -5,6 +5,7 @@
  * KRA, KPI & Task Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { KraFrequency } from './kraFrequency';
 import type { KraHrApprovalStatus } from './kraHrApprovalStatus';
 import type { KraKraStatus } from './kraKraStatus';
 import type { KraReviewPeriod } from './kraReviewPeriod';
@@ -24,6 +25,9 @@ export interface Kra {
   /** @nullable */
   employeeName?: string | null;
   reviewPeriod?: KraReviewPeriod;
+  frequency?: KraFrequency;
+  /** @nullable */
+  dueDate?: string | null;
   kraStatus: KraKraStatus;
   hrApprovalStatus?: KraHrApprovalStatus;
   /** @nullable */

@@ -184,6 +184,18 @@ export const KraReviewPeriod = {
   yearly: 'yearly',
 } as const;
 
+export type KraFrequency = typeof KraFrequency[keyof typeof KraFrequency];
+
+
+export const KraFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  bi_weekly: 'bi_weekly',
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  yearly: 'yearly',
+} as const;
+
 export type KraKraStatus = typeof KraKraStatus[keyof typeof KraKraStatus];
 
 
@@ -219,6 +231,9 @@ export interface Kra {
   /** @nullable */
   employeeName?: string | null;
   reviewPeriod?: KraReviewPeriod;
+  frequency?: KraFrequency;
+  /** @nullable */
+  dueDate?: string | null;
   kraStatus: KraKraStatus;
   hrApprovalStatus?: KraHrApprovalStatus;
   /** @nullable */
@@ -237,6 +252,18 @@ export const KraInputReviewPeriod = {
   yearly: 'yearly',
 } as const;
 
+export type KraInputFrequency = typeof KraInputFrequency[keyof typeof KraInputFrequency];
+
+
+export const KraInputFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  bi_weekly: 'bi_weekly',
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  yearly: 'yearly',
+} as const;
+
 export interface KraInput {
   /** @minLength 1 */
   title: string;
@@ -245,6 +272,8 @@ export interface KraInput {
   departmentId: number;
   employeeId?: number;
   reviewPeriod: KraInputReviewPeriod;
+  frequency: KraInputFrequency;
+  dueDate?: string;
 }
 
 export type KraUpdateReviewPeriod = typeof KraUpdateReviewPeriod[keyof typeof KraUpdateReviewPeriod];
@@ -256,12 +285,26 @@ export const KraUpdateReviewPeriod = {
   yearly: 'yearly',
 } as const;
 
+export type KraUpdateFrequency = typeof KraUpdateFrequency[keyof typeof KraUpdateFrequency];
+
+
+export const KraUpdateFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  bi_weekly: 'bi_weekly',
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  yearly: 'yearly',
+} as const;
+
 export interface KraUpdate {
   title?: string;
   description?: string;
   weightage?: number;
   achievementPct?: number;
   reviewPeriod?: KraUpdateReviewPeriod;
+  frequency?: KraUpdateFrequency;
+  dueDate?: string;
   employeeId?: number;
 }
 

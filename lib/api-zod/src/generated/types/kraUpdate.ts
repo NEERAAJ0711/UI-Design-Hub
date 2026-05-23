@@ -5,6 +5,7 @@
  * KRA, KPI & Task Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { KraUpdateFrequency } from './kraUpdateFrequency';
 import type { KraUpdateReviewPeriod } from './kraUpdateReviewPeriod';
 
 export interface KraUpdate {
@@ -13,5 +14,7 @@ export interface KraUpdate {
   weightage?: number;
   achievementPct?: number;
   reviewPeriod?: KraUpdateReviewPeriod;
+  frequency?: KraUpdateFrequency;
+  dueDate?: string;
   employeeId?: number;
 }
