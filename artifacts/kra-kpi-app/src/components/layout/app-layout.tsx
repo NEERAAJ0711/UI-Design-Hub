@@ -70,6 +70,72 @@ const ADMIN_NAV = [
   { name: "System Admin", href: "/admin", icon: Settings, roles: ["admin"] },
 ];
 
+function RpsLogoSidebar({ isAdmin }: { isAdmin: boolean }) {
+  const blue = isAdmin ? "#ef4444" : "#1e3a70";
+  return (
+    <div className="flex items-center gap-2.5 py-0.5">
+      {/* Arch mark SVG — matches RPS logo icon */}
+      <svg
+        viewBox="0 0 56 60"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-9 w-auto flex-shrink-0"
+        aria-hidden="true"
+      >
+        {/* Outer arch */}
+        <path
+          d="M4 56 L4 30 Q4 4 28 4 Q52 4 52 30 L52 56"
+          stroke="#9ca3af"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Middle arch */}
+        <path
+          d="M13 56 L13 33 Q13 14 28 14 Q43 14 43 33 L43 56"
+          stroke="#9ca3af"
+          strokeWidth="4.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Inner arch */}
+        <path
+          d="M22 56 L22 37 Q22 24 28 24 Q34 24 34 37 L34 56"
+          stroke="#9ca3af"
+          strokeWidth="4"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Cross-brace top-left */}
+        <line x1="9" y1="17" x2="22" y2="10" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" />
+        {/* Cross-brace top-right */}
+        <line x1="47" y1="17" x2="34" y2="10" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" />
+      </svg>
+
+      {/* Wordmark */}
+      <div className="min-w-0 flex-1 leading-none">
+        <div className="flex items-baseline gap-1">
+          <span
+            className="text-xl font-black tracking-tight"
+            style={{ color: blue, fontFamily: "Georgia, 'Times New Roman', serif", letterSpacing: "-0.02em" }}
+          >
+            RPS
+          </span>
+          <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">
+            GROUP
+          </span>
+        </div>
+        <div className="flex items-center gap-1 mt-[1px]">
+          <div className="h-px flex-1 bg-slate-300 dark:bg-slate-600" />
+          <span className="text-[8.5px] font-semibold text-slate-400 dark:text-slate-500 tracking-[0.12em] uppercase whitespace-nowrap">
+            Infrastructure Ltd
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -82,23 +148,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={`border-r border-border bg-sidebar text-sidebar-foreground ${isAdmin ? "border-r-red-200 dark:border-r-red-900/30" : ""}`}>
-      <SidebarHeader className="px-3 py-2.5 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="flex-shrink-0 bg-white rounded-md overflow-hidden shadow-sm">
-            <img
-              src="/logo.png"
-              alt="RPS Group"
-              className="h-9 w-auto object-contain"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className={`text-[11px] font-bold leading-tight truncate ${isAdmin ? "text-red-500" : "text-primary"}`}>
-              RPS INFRASTRUCTURE
-            </p>
-            <p className="text-[9px] text-sidebar-foreground/55 truncate leading-tight font-medium">LIMITED</p>
-          </div>
-          {isAdmin && <ShieldAlert className="ml-auto h-3.5 w-3.5 text-red-400 shrink-0" />}
-        </div>
+      <SidebarHeader className="px-3 py-2 border-b border-sidebar-border">
+        <RpsLogoSidebar isAdmin={isAdmin} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
