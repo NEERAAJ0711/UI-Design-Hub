@@ -40,6 +40,7 @@ router.get("/tasks", async (req, res) => {
   const params = ListTasksQueryParams.parse(req.query);
   const conditions = [];
   if (params.assignedToId) conditions.push(eq(tasksTable.assignedToId, params.assignedToId));
+  if (params.createdById) conditions.push(eq(tasksTable.createdById, params.createdById));
   if (params.departmentId) conditions.push(eq(tasksTable.departmentId, params.departmentId));
   if (params.status) conditions.push(eq(tasksTable.status, params.status));
   if (params.priority) conditions.push(eq(tasksTable.priority, params.priority));

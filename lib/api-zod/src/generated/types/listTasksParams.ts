@@ -8,6 +8,7 @@
 
 export type ListTasksParams = {
 assignedToId?: number;
+createdById?: number;
 departmentId?: number;
 status?: string;
 priority?: string;

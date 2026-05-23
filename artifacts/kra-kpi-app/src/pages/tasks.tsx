@@ -97,25 +97,57 @@ function EmployeeTasks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: tasks, isLoading } = useListTasks(
-    { assignedToId: user!.id },
-    { query: { queryKey: getListTasksQueryKey({ assignedToId: user!.id }) } }
+  const assignedParams = { assignedToId: user!.id };
+  const createdParams = { createdById: user!.id };
+
+  const { data: assignedTasks, isLoading: loadingAssigned } = useListTasks(
+    assignedParams,
+    { query: { queryKey: getListTasksQueryKey(assignedParams) } }
   );
+  const { data: createdTasks, isLoading: loadingCreated } = useListTasks(
+    createdParams,
+    { query: { queryKey: getListTasksQueryKey(createdParams) } }
+  );
+  const isLoading = loadingAssigned || loadingCreated;
+
+  // Merge assigned + created, deduplicate by id, tag each with viewer role
+  const tasks = (() => {
+    const map = new Map<number, NonNullable<typeof assignedTasks>[number] & { myRole: "assignee" | "creator" | "both" }>();
+    for (const t of assignedTasks ?? []) map.set(t.id, { ...t, myRole: "assignee" });
+    for (const t of createdTasks ?? []) {
+      const existing = map.get(t.id);
+      if (existing) existing.myRole = "both";
+      else map.set(t.id, { ...t, myRole: "creator" });
+    }
+    return [...map.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  })();
+
   const { data: employees } = useListEmployees();
   const requestStatus = useRequestTaskStatus();
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterRole, setFilterRole] = useState<"all" | "assignee" | "creator">("all");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [requestStatusDialog, setRequestStatusDialog] = useState<{ id: number; title: string } | null>(null);
   const [requestedNewStatus, setRequestedNewStatus] = useState<string>("in_progress");
   const [progressInput, setProgressInput] = useState(0);
 
-  const filtered = tasks?.filter((t) => filterStatus === "all" || t.status === filterStatus);
+  const filtered = tasks.filter((t) => {
+    if (filterStatus !== "all" && t.status !== filterStatus) return false;
+    if (filterRole === "assignee" && t.myRole === "creator") return false;
+    if (filterRole === "creator" && t.myRole === "assignee") return false;
+    return true;
+  });
+
+  function invalidateTasks() {
+    queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(assignedParams) });
+    queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(createdParams) });
+  }
 
   function submitStatusRequest() {
     if (!requestStatusDialog) return;
     requestStatus.mutate({ id: requestStatusDialog.id, data: { status: requestedNewStatus as typeof EMPLOYEE_REQUESTABLE[number], progressPct: progressInput } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ assignedToId: user!.id }) });
+        invalidateTasks();
         setRequestStatusDialog(null);
         toast({ title: "Status change requested — awaiting manager approval." });
       },
@@ -126,15 +158,23 @@ function EmployeeTasks() {
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">My Tasks</h2>
-        <p className="text-muted-foreground">Tasks assigned to you. Request status updates for manager approval.</p>
+        <p className="text-muted-foreground">Tasks assigned to you or created by you.</p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterRole} onValueChange={(v) => setFilterRole(v as typeof filterRole)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Roles" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="assignee">Assigned to Me</SelectItem>
+            <SelectItem value="creator">Created by Me</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -145,6 +185,7 @@ function EmployeeTasks() {
             <TableHeader>
               <TableRow>
                 <TableHead>Task</TableHead>
+                <TableHead>My Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Progress</TableHead>
@@ -156,7 +197,7 @@ function EmployeeTasks() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[250, 100, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                    {[250, 90, 100, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                   </TableRow>
                 ))
               ) : filtered?.length ? (
@@ -176,6 +217,14 @@ function EmployeeTasks() {
                           </div>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {task.myRole === "both"
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">Assignee &amp; Creator</span>
+                        : task.myRole === "assignee"
+                          ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Assignee</span>
+                          : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Creator</span>
+                      }
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[task.status] ?? ""}`}>
@@ -205,7 +254,7 @@ function EmployeeTasks() {
                           <DropdownMenuItem onClick={() => setDetailId(task.id)}>
                             <MessageSquare className="mr-2 h-4 w-4" /> View & Comments
                           </DropdownMenuItem>
-                          {!task.requestedStatus && (
+                          {task.myRole !== "creator" && !task.requestedStatus && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => { setRequestStatusDialog({ id: task.id, title: task.title }); setRequestedNewStatus("in_progress"); setProgressInput(task.progressPct ?? 0); }}>
@@ -220,7 +269,7 @@ function EmployeeTasks() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
                 </TableRow>
               )}
             </TableBody>

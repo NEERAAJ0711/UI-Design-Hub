@@ -725,6 +725,7 @@ export const DeleteKpiParams = zod.object({
  */
 export const ListTasksQueryParams = zod.object({
   "assignedToId": zod.coerce.number().optional(),
+  "createdById": zod.coerce.number().optional(),
   "departmentId": zod.coerce.number().optional(),
   "status": zod.coerce.string().optional(),
   "priority": zod.coerce.string().optional()
