@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Loader2, LayoutDashboard, ShieldAlert } from "lucide-react";
+import { AlertCircle, Loader2, ShieldAlert } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
   { role: "System Admin", email: "admin@company.com", label: "System Admin", isAdmin: true },
@@ -37,24 +37,33 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Brand */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-2">
-            <LayoutDashboard className="h-6 w-6 text-primary" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 dark:from-slate-950 dark:via-blue-950/20 dark:to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-5">
+
+        {/* Brand / Logo */}
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md px-6 py-4 inline-flex items-center justify-center border border-slate-200 dark:border-slate-700">
+              <img
+                src="/logo.png"
+                alt="RPS Group"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Command<span className="text-primary">Center</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            KRA, KPI & Task Management System
-          </p>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+              RPS INFRASTRUCTURE LIMITED
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              KRA, KPI &amp; Task Management System
+            </p>
+          </div>
         </div>
 
         {/* Login card */}
-        <Card className="shadow-lg border-border">
-          <CardHeader className="space-y-1">
+        <Card className="shadow-xl border-border">
+          <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">Sign in</CardTitle>
             <CardDescription>Enter your work email and password</CardDescription>
           </CardHeader>
@@ -96,7 +105,7 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-blue-700 hover:bg-blue-800 text-white"
                 disabled={loading}
                 data-testid="button-login-submit"
               >
@@ -145,6 +154,10 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+
+        <p className="text-center text-xs text-slate-400 dark:text-slate-600">
+          © {new Date().getFullYear()} RPS Infrastructure Limited. All rights reserved.
+        </p>
       </div>
     </div>
   );
