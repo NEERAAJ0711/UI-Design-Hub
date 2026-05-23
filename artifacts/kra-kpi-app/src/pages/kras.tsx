@@ -316,6 +316,7 @@ function HrKras() {
   const [deleteTarget, setDeleteTarget] = useState<KraRow | null>(null);
   const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [filterDept, setFilterDept] = useState("all");
+  const [filterEmp, setFilterEmp] = useState("all");
   const [qDates, setQDates] = useState(["", "", "", ""]);
   const [qDateErrors, setQDateErrors] = useState(["", "", "", ""]);
 
@@ -335,7 +336,11 @@ function HrKras() {
   const krasPendingHrApproval = pendingData?.krasPendingHrApproval ?? [];
   const pendingKraApprovals = pendingData?.kras ?? [];
 
-  const filteredAll = allKras?.filter((k) => filterDept === "all" || k.departmentId === Number(filterDept));
+  const filteredAll = allKras?.filter((k) => {
+    if (filterDept !== "all" && k.departmentId !== Number(filterDept)) return false;
+    if (filterEmp !== "all" && k.employeeId !== Number(filterEmp)) return false;
+    return true;
+  });
 
   function openCreate() {
     setEditTarget(null);
@@ -490,12 +495,22 @@ function HrKras() {
             </div>
             <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Add KRA</Button>
           </div>
-          <div className="flex gap-3">
-            <Select value={filterDept} onValueChange={setFilterDept}>
+          <div className="flex flex-wrap gap-3">
+            <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterEmp("all"); }}>
               <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterEmp} onValueChange={setFilterEmp}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Employees" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                {(filterDept === "all"
+                  ? employees
+                  : employees?.filter(e => e.departmentId === Number(filterDept))
+                )?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -1355,6 +1370,7 @@ function FullKras() {
   const [deleteTarget, setDeleteTarget] = useState<KraRow | null>(null);
   const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [filterDept, setFilterDept] = useState("all");
+  const [filterEmp, setFilterEmp] = useState("all");
   const [qDates, setQDates] = useState(["", "", "", ""]);
   const [qDateErrors, setQDateErrors] = useState(["", "", "", ""]);
 
@@ -1458,7 +1474,11 @@ function FullKras() {
     });
   }
 
-  const filtered = kras?.filter((k) => filterDept === "all" || k.departmentId === Number(filterDept));
+  const filtered = kras?.filter((k) => {
+    if (filterDept !== "all" && k.departmentId !== Number(filterDept)) return false;
+    if (filterEmp !== "all" && k.employeeId !== Number(filterEmp)) return false;
+    return true;
+  });
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
@@ -1544,12 +1564,22 @@ function FullKras() {
       )}
 
       {user?.role !== "hod" && (
-        <div className="flex gap-3">
-          <Select value={filterDept} onValueChange={setFilterDept}>
+        <div className="flex flex-wrap gap-3">
+          <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterEmp("all"); }}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Departments</SelectItem>
               {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterEmp} onValueChange={setFilterEmp}>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Employees" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Employees</SelectItem>
+              {(filterDept === "all"
+                ? employees
+                : employees?.filter(e => e.departmentId === Number(filterDept))
+              )?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
