@@ -10,6 +10,7 @@ export type EmployeeInputRole = typeof EmployeeInputRole[keyof typeof EmployeeIn
 
 
 export const EmployeeInputRole = {
+  admin: 'admin',
   management: 'management',
   hod: 'hod',
   manager: 'manager',

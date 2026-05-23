@@ -15,6 +15,7 @@ export type CurrentUserRole = typeof CurrentUserRole[keyof typeof CurrentUserRol
 
 
 export const CurrentUserRole = {
+  admin: 'admin',
   management: 'management',
   hod: 'hod',
   manager: 'manager',
@@ -74,6 +75,7 @@ export type EmployeeRole = typeof EmployeeRole[keyof typeof EmployeeRole];
 
 
 export const EmployeeRole = {
+  admin: 'admin',
   management: 'management',
   hod: 'hod',
   manager: 'manager',
@@ -104,6 +106,7 @@ export type EmployeeInputRole = typeof EmployeeInputRole[keyof typeof EmployeeIn
 
 
 export const EmployeeInputRole = {
+  admin: 'admin',
   management: 'management',
   hod: 'hod',
   manager: 'manager',
@@ -126,6 +129,7 @@ export type EmployeeUpdateRole = typeof EmployeeUpdateRole[keyof typeof Employee
 
 
 export const EmployeeUpdateRole = {
+  admin: 'admin',
   management: 'management',
   hod: 'hod',
   manager: 'manager',

@@ -10,6 +10,7 @@ import Employees from "@/pages/employees";
 import Tasks from "@/pages/tasks";
 import KRAs from "@/pages/kras";
 import KPIs from "@/pages/kpis";
+import Admin from "@/pages/admin";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -22,6 +23,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const isAdmin = (role: string) => role === "admin";
+const isManagement = (role: string) => role === "admin" || role === "management";
+const isHodOrAbove = (role: string) => role === "admin" || role === "management" || role === "hod";
+const isManagerOrAbove = (role: string) => role === "admin" || role === "management" || role === "hod" || role === "manager";
 
 function ProtectedRoutes() {
   const { user, isLoading } = useAuth();
@@ -42,16 +48,19 @@ function ProtectedRoutes() {
     <AppLayout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        {(user.role === "management" || user.role === "hod") && (
+        {isHodOrAbove(user.role) && (
           <Route path="/departments" component={Departments} />
         )}
-        {(user.role === "management" || user.role === "hod" || user.role === "manager") && (
+        {isManagerOrAbove(user.role) && (
           <Route path="/employees" component={Employees} />
         )}
         <Route path="/tasks" component={Tasks} />
         <Route path="/kras" component={KRAs} />
-        {(user.role === "management" || user.role === "hod" || user.role === "manager") && (
+        {isManagerOrAbove(user.role) && (
           <Route path="/kpis" component={KPIs} />
+        )}
+        {isAdmin(user.role) && (
+          <Route path="/admin" component={Admin} />
         )}
         <Route component={NotFound} />
       </Switch>

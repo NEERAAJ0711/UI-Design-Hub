@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Loader2, LayoutDashboard } from "lucide-react";
+import { AlertCircle, Loader2, LayoutDashboard, ShieldAlert } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
-  { role: "Management", email: "rajan.mehta@company.com", label: "Rajan Mehta" },
-  { role: "HOD (HR)", email: "priya.sharma@company.com", label: "Priya Sharma" },
-  { role: "HOD (IT)", email: "anil.kumar@company.com", label: "Anil Kumar" },
-  { role: "Manager", email: "sunita.verma@company.com", label: "Sunita Verma" },
-  { role: "Employee", email: "rekha.iyer@company.com", label: "Rekha Iyer" },
+  { role: "System Admin", email: "admin@company.com", label: "System Admin", isAdmin: true },
+  { role: "Management", email: "rajan.mehta@company.com", label: "Rajan Mehta", isAdmin: false },
+  { role: "HOD (HR)", email: "priya.sharma@company.com", label: "Priya Sharma", isAdmin: false },
+  { role: "HOD (IT)", email: "anil.kumar@company.com", label: "Anil Kumar", isAdmin: false },
+  { role: "Manager", email: "sunita.verma@company.com", label: "Sunita Verma", isAdmin: false },
+  { role: "Employee", email: "rekha.iyer@company.com", label: "Rekha Iyer", isAdmin: false },
 ];
 
 export default function Login() {
@@ -129,11 +130,14 @@ export default function Login() {
                   key={acc.email}
                   type="button"
                   onClick={() => fillDemo(acc.email)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors group text-left"
-                  data-testid={`button-demo-${acc.role.toLowerCase().replace(/\s/g, "-")}`}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors group text-left ${acc.isAdmin ? "border border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20" : ""}`}
+                  data-testid={`button-demo-${acc.role.toLowerCase().replace(/[\s()]/g, "-")}`}
                 >
-                  <span className="font-medium">{acc.label}</span>
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                  <div className="flex items-center gap-2">
+                    {acc.isAdmin && <ShieldAlert className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                    <span className={`font-medium ${acc.isAdmin ? "text-red-700 dark:text-red-400" : ""}`}>{acc.label}</span>
+                  </div>
+                  <span className={`text-xs group-hover:text-foreground transition-colors ${acc.isAdmin ? "text-red-500 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
                     {acc.role}
                   </span>
                 </button>

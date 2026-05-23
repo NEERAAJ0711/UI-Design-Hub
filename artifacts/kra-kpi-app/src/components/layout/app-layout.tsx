@@ -11,6 +11,8 @@ import {
   UserCheck,
   Briefcase,
   UserCircle,
+  ShieldAlert,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,11 +25,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/auth-context";
 
+const ALL_ROLES = ["admin", "management", "hod", "manager", "employee"] as const;
+
 const roleIcons: Record<string, React.ElementType> = {
+  admin: ShieldAlert,
   management: Shield,
   hod: UserCheck,
   manager: Briefcase,
@@ -35,6 +41,7 @@ const roleIcons: Record<string, React.ElementType> = {
 };
 
 const roleLabels: Record<string, string> = {
+  admin: "System Admin",
   management: "Management",
   hod: "Head of Department",
   manager: "Manager",
@@ -42,42 +49,48 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleColors: Record<string, string> = {
+  admin: "text-red-400",
   management: "text-purple-400",
   hod: "text-blue-400",
   manager: "text-green-400",
   employee: "text-gray-400",
 };
 
-const ALL_NAV = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["management", "hod", "manager", "employee"] },
-  { name: "Departments", href: "/departments", icon: Building2, roles: ["management", "hod"] },
-  { name: "Employees", href: "/employees", icon: Users, roles: ["management", "hod", "manager"] },
-  { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ["management", "hod", "manager", "employee"] },
-  { name: "KRAs", href: "/kras", icon: Target, roles: ["management", "hod", "manager", "employee"] },
-  { name: "KPIs", href: "/kpis", icon: BarChart, roles: ["management", "hod", "manager"] },
+const MAIN_NAV = [
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ALL_ROLES },
+  { name: "Departments", href: "/departments", icon: Building2, roles: ["admin", "management", "hod"] },
+  { name: "Employees", href: "/employees", icon: Users, roles: ["admin", "management", "hod", "manager"] },
+  { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ALL_ROLES },
+  { name: "KRAs", href: "/kras", icon: Target, roles: ALL_ROLES },
+  { name: "KPIs", href: "/kpis", icon: BarChart, roles: ["admin", "management", "hod", "manager"] },
+];
+
+const ADMIN_NAV = [
+  { name: "System Admin", href: "/admin", icon: Settings, roles: ["admin"] },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const navigation = ALL_NAV.filter(
-    (item) => !user || item.roles.includes(user.role)
-  );
+  const mainNav = MAIN_NAV.filter((item) => !user || item.roles.includes(user.role as typeof ALL_ROLES[number]));
+  const adminNav = ADMIN_NAV.filter((item) => !user || item.roles.includes(user.role as typeof ALL_ROLES[number]));
 
   const RoleIcon = user ? (roleIcons[user.role] ?? UserCircle) : UserCircle;
+  const isAdmin = user?.role === "admin";
 
   return (
-    <Sidebar className="border-r border-border bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="flex h-14 items-center px-4 font-bold text-xl tracking-tight text-primary">
+    <Sidebar className={`border-r border-border bg-sidebar text-sidebar-foreground ${isAdmin ? "border-r-red-200 dark:border-r-red-900/30" : ""}`}>
+      <SidebarHeader className={`flex h-14 items-center px-4 font-bold text-xl tracking-tight ${isAdmin ? "text-red-500" : "text-primary"}`}>
         Command<span className="text-sidebar-foreground">Center</span>
+        {isAdmin && <ShieldAlert className="ml-2 h-4 w-4 text-red-400 shrink-0" />}
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => (
+              {mainNav.map((item) => (
                 <SidebarMenuItem key={item.name}>
                   <SidebarMenuButton
                     asChild
@@ -94,18 +107,46 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {adminNav.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-red-400">Administration</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminNav.map((item) => (
+                    <SidebarMenuItem key={item.name}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location === item.href}
+                        tooltip={item.name}
+                      >
+                        <Link href={item.href} className="flex items-center gap-3 text-red-400 hover:text-red-300">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
       <SidebarFooter>
         {user && (
-          <div className="px-3 py-2 mb-1 rounded-lg bg-sidebar-accent/50">
+          <div className={`px-3 py-2 mb-1 rounded-lg ${isAdmin ? "bg-red-950/30 border border-red-900/30" : "bg-sidebar-accent/50"}`}>
             <div className="flex items-center gap-2.5">
-              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+              <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${isAdmin ? "bg-red-500/20" : "bg-primary/20"}`}>
                 <RoleIcon className={`h-4 w-4 ${roleColors[user.role] ?? "text-gray-400"}`} />
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-sidebar-foreground truncate">{user.name}</p>
                 <p className={`text-xs truncate ${roleColors[user.role] ?? "text-gray-400"}`}>
-                  {roleLabels[user.role] ?? user.role} · {user.departmentName}
+                  {roleLabels[user.role] ?? user.role}
+                  {user.departmentName && !isAdmin ? ` · ${user.departmentName}` : ""}
                 </p>
               </div>
             </div>

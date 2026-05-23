@@ -39,6 +39,7 @@ export default function Dashboard() {
   if (!user) return null;
   if (user.role === "employee") return <EmployeeDashboard userId={user.id} />;
   if (user.role === "manager" || user.role === "hod") return <ManagerHodDashboard />;
+  // admin and management both get the full company view
   return <ManagementDashboard />;
 }
 
