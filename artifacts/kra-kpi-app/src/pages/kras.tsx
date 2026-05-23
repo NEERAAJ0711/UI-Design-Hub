@@ -93,6 +93,18 @@ function formatDueDateCell(dueDate: string | null | undefined, frequency: string
   return <span className="text-muted-foreground text-sm">—</span>;
 }
 
+function autoFormatDDMM(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+function isValidDDMM(s: string): boolean {
+  if (!/^\d{2}\/\d{2}$/.test(s)) return false;
+  const [dd, mm] = s.split("/").map(Number);
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
+}
+
 const kraSchema = z.object({
   title: z.string().min(1, "Title required"),
   description: z.string().optional(),
@@ -101,6 +113,16 @@ const kraSchema = z.object({
   employeeId: z.number().optional(),
   frequency: z.enum(FREQUENCIES),
   dueDate: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.frequency === "monthly") {
+    const day = parseInt(data.dueDate ?? "", 10);
+    if (!data.dueDate || isNaN(day) || day < 1 || day > 31)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid day between 1 and 31", path: ["dueDate"] });
+  }
+  if (data.frequency === "yearly") {
+    if (!data.dueDate || !isValidDDMM(data.dueDate))
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid date as DD/MM — e.g. 31/03", path: ["dueDate"] });
+  }
 });
 type KraForm = z.infer<typeof kraSchema>;
 
@@ -276,6 +298,7 @@ function FullKras() {
   const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [filterDept, setFilterDept] = useState("all");
   const [qDates, setQDates] = useState(["", "", "", ""]);
+  const [qDateErrors, setQDateErrors] = useState(["", "", "", ""]);
 
   const form = useForm<KraForm>({
     resolver: zodResolver(kraSchema),
@@ -294,6 +317,7 @@ function FullKras() {
   function openCreate() {
     setEditTarget(null);
     setQDates(["", "", "", ""]);
+    setQDateErrors(["", "", "", ""]);
     form.reset({
       title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "",
       departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
@@ -310,6 +334,7 @@ function FullKras() {
     } else {
       setQDates(["", "", "", ""]);
     }
+    setQDateErrors(["", "", "", ""]);
     form.reset({
       title: kra.title,
       description: kra.description ?? "",
@@ -323,12 +348,16 @@ function FullKras() {
   }
 
   function onSubmit(values: KraForm) {
+    if (values.frequency === "quarterly") {
+      const errors = qDates.map(d => isValidDDMM(d.trim()) ? "" : "Required — enter DD/MM (e.g. 31/03)");
+      setQDateErrors(errors);
+      if (errors.some(e => e)) return;
+    }
     const needsDate = (FREQ_NEEDS_DATE as readonly string[]).includes(values.frequency);
     let dueDateVal: string | undefined;
     if (needsDate) {
       if (values.frequency === "quarterly") {
-        const filled = qDates.map(d => d.trim()).filter(Boolean);
-        dueDateVal = filled.length > 0 ? filled.join(",") : undefined;
+        dueDateVal = qDates.map(d => d.trim()).join(",");
       } else {
         dueDateVal = values.dueDate || undefined;
       }
@@ -618,7 +647,7 @@ function FullKras() {
                     <FormItem>
                       <FormLabel>Annual Date <span className="text-xs text-muted-foreground">(DD/MM)</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. 31/03" maxLength={5} {...field} className="w-32" />
+                        <Input placeholder="e.g. 31/03" maxLength={5} {...field} onChange={(e) => field.onChange(autoFormatDDMM(e.target.value))} className="w-32" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -627,11 +656,24 @@ function FullKras() {
                 {watchedFrequency === "quarterly" && (
                   <div className="col-span-2 space-y-2">
                     <p className="text-sm font-medium leading-none">Quarterly Dates <span className="text-xs font-normal text-muted-foreground">(DD/MM for each quarter)</span></p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                       {(["Q1", "Q2", "Q3", "Q4"] as const).map((q, i) => (
-                        <div key={q} className="flex items-center gap-2">
-                          <span className="text-sm font-medium w-7 shrink-0">{q}</span>
-                          <Input placeholder="DD/MM" maxLength={5} value={qDates[i]} onChange={(e) => setQDates(prev => prev.map((v, idx) => idx === i ? e.target.value : v))} />
+                        <div key={q} className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium w-7 shrink-0">{q}</span>
+                            <Input
+                              placeholder="DD/MM"
+                              maxLength={5}
+                              value={qDates[i]}
+                              onChange={(e) => {
+                                const v = autoFormatDDMM(e.target.value);
+                                setQDates(prev => prev.map((old, idx) => idx === i ? v : old));
+                                if (qDateErrors[i]) setQDateErrors(prev => prev.map((err, idx) => idx === i ? "" : err));
+                              }}
+                              className={qDateErrors[i] ? "border-destructive focus-visible:ring-destructive" : ""}
+                            />
+                          </div>
+                          {qDateErrors[i] && <p className="text-xs text-destructive pl-9">{qDateErrors[i]}</p>}
                         </div>
                       ))}
                     </div>
