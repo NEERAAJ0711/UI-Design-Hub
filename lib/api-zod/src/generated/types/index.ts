@@ -44,7 +44,6 @@ export * from './kraFrequency';
 export * from './kraHrApprovalStatus';
 export * from './kraInput';
 export * from './kraInputFrequency';
-export * from './kraInputReviewPeriod';
 export * from './kraKraStatus';
 export * from './kraReviewPeriod';
 export * from './kraScoreInput';

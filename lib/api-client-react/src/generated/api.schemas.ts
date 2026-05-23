@@ -243,15 +243,6 @@ export interface Kra {
   createdAt: string;
 }
 
-export type KraInputReviewPeriod = typeof KraInputReviewPeriod[keyof typeof KraInputReviewPeriod];
-
-
-export const KraInputReviewPeriod = {
-  monthly: 'monthly',
-  quarterly: 'quarterly',
-  yearly: 'yearly',
-} as const;
-
 export type KraInputFrequency = typeof KraInputFrequency[keyof typeof KraInputFrequency];
 
 
@@ -271,7 +262,6 @@ export interface KraInput {
   weightage: number;
   departmentId: number;
   employeeId?: number;
-  reviewPeriod: KraInputReviewPeriod;
   frequency: KraInputFrequency;
   dueDate?: string;
 }

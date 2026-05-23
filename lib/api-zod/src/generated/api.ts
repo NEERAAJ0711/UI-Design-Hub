@@ -402,7 +402,6 @@ export const CreateKraBody = zod.object({
   "weightage": zod.number(),
   "departmentId": zod.number(),
   "employeeId": zod.number().optional(),
-  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']),
   "frequency": zod.enum(['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'yearly']),
   "dueDate": zod.string().optional()
 })

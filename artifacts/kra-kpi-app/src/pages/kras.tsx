@@ -62,13 +62,14 @@ const hrStatusLabel: Record<string, string> = {
   hr_rejected: "HR Rejected",
 };
 
+const FREQ_NEEDS_DATE = ["monthly", "quarterly", "yearly"] as const;
+
 const kraSchema = z.object({
   title: z.string().min(1, "Title required"),
   description: z.string().optional(),
   weightage: z.number({ required_error: "Weightage required" }).min(0).max(100),
   departmentId: z.number({ required_error: "Department required" }),
   employeeId: z.number().optional(),
-  reviewPeriod: z.enum(PERIODS),
   frequency: z.enum(FREQUENCIES),
   dueDate: z.string().optional(),
 });
@@ -127,7 +128,8 @@ function EmployeeKras() {
             <TableHeader>
               <TableRow>
                 <TableHead>KRA Title</TableHead>
-                <TableHead>Period</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead>Due Date</TableHead>
                 <TableHead>Weightage</TableHead>
                 <TableHead className="w-[200px]">Achievement</TableHead>
                 <TableHead>Status</TableHead>
@@ -138,7 +140,7 @@ function EmployeeKras() {
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[200, 80, 60, 200, 100, 80].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                    {[200, 90, 90, 60, 200, 100, 80].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                   </TableRow>
                 ))
               ) : kras?.length ? (
@@ -151,7 +153,15 @@ function EmployeeKras() {
                         <div className="text-xs text-muted-foreground">{kra.departmentName}</div>
                       </div>
                     </TableCell>
-                    <TableCell className="capitalize">{kra.reviewPeriod}</TableCell>
+                    <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
+                    <TableCell>
+                      {kra.dueDate ? (
+                        <div className={`flex items-center gap-1 text-sm ${kra.dueDate < new Date().toISOString().split("T")[0] && kra.kraStatus !== "approved" ? "text-red-600 font-medium" : ""}`}>
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          {format(new Date(kra.dueDate), "MMM d, yyyy")}
+                        </div>
+                      ) : <span className="text-muted-foreground text-sm">—</span>}
+                    </TableCell>
                     <TableCell>{kra.weightage}%</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -246,7 +256,7 @@ function FullKras() {
 
   const form = useForm<KraForm>({
     resolver: zodResolver(kraSchema),
-    defaultValues: { title: "", description: "", weightage: 20, reviewPeriod: "monthly", frequency: "monthly", dueDate: "" },
+    defaultValues: { title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "" },
   });
   const scoreForm = useForm<ScoreForm>({ resolver: zodResolver(scoreSchema), defaultValues: { achievementPct: 0 } });
 
@@ -256,10 +266,13 @@ function FullKras() {
   const pendingKraApprovals = pendingData?.kras ?? [];
   const krasPendingHrApproval = pendingData?.krasPendingHrApproval ?? [];
 
+  const watchedFrequency = form.watch("frequency");
+  const showDueDate = (FREQ_NEEDS_DATE as readonly string[]).includes(watchedFrequency);
+
   function openCreate() {
     setEditTarget(null);
     form.reset({
-      title: "", description: "", weightage: 20, reviewPeriod: "monthly", frequency: "monthly", dueDate: "",
+      title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "",
       departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
     });
     setDialogOpen(true);
@@ -273,7 +286,6 @@ function FullKras() {
       weightage: kra.weightage,
       departmentId: kra.departmentId,
       employeeId: kra.employeeId ?? undefined,
-      reviewPeriod: (kra.reviewPeriod ?? "monthly") as typeof PERIODS[number],
       frequency: (kra.frequency ?? "monthly") as typeof FREQUENCIES[number],
       dueDate: kra.dueDate ?? "",
     });
@@ -281,7 +293,8 @@ function FullKras() {
   }
 
   function onSubmit(values: KraForm) {
-    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined, dueDate: values.dueDate || undefined };
+    const needsDate = (FREQ_NEEDS_DATE as readonly string[]).includes(values.frequency);
+    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined, dueDate: needsDate ? (values.dueDate || undefined) : undefined };
     if (editTarget) {
       updateKra.mutate({ id: editTarget.id, data: payload }, {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "KRA updated" }); },
@@ -359,7 +372,7 @@ function FullKras() {
                   <div>
                     <p className="text-sm font-medium">{kra.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-muted-foreground">{kra.departmentName} · {kra.reviewPeriod} · {kra.weightage}% weight</p>
+                      <p className="text-xs text-muted-foreground">{kra.departmentName} · {FREQUENCY_LABELS[kra.reviewPeriod ?? ""] ?? kra.reviewPeriod} · {kra.weightage}% weight</p>
                     </div>
                     {kra.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[340px]">{kra.description}</p>}
                   </div>
@@ -546,26 +559,23 @@ function FullKras() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="reviewPeriod" render={({ field }) => (
-                  <FormItem><FormLabel>Review Period</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>{PERIODS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
-                )} />
                 <FormField control={form.control} name="frequency" render={({ field }) => (
                   <FormItem><FormLabel>Monitoring Frequency</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (!(FREQ_NEEDS_DATE as readonly string[]).includes(v)) form.setValue("dueDate", ""); }}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>{FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}</SelectContent>
                     </Select><FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem><FormLabel>Due Date</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                {showDueDate && (
+                  <FormField control={form.control} name="dueDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Date <span className="text-xs text-muted-foreground">(fixed anchor date for this cycle)</span></FormLabel>
+                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
                 <FormField control={form.control} name="departmentId" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel>
                     <Select
