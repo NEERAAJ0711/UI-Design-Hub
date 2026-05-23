@@ -312,14 +312,14 @@ export default function Employees() {
                 <FormField control={form.control} name="managerId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Manager</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : undefined)}>
+                    <Select value={field.value?.toString() ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? undefined : Number(v))}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="No manager" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No manager</SelectItem>
+                        <SelectItem value="none">No manager</SelectItem>
                         {employees?.filter((e) => e.id !== editTarget?.id).map((e) => (
                           <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>
                         ))}
