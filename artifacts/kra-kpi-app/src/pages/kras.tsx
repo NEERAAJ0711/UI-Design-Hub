@@ -225,11 +225,17 @@ function FullKras() {
   });
   const scoreForm = useForm<ScoreForm>({ resolver: zodResolver(scoreSchema), defaultValues: { achievementPct: 0 } });
 
+  const selectedDeptId = form.watch("departmentId");
+  const deptEmployees = employees?.filter((e) => selectedDeptId ? e.departmentId === selectedDeptId : true);
+
   const pendingKraApprovals = pendingData?.kras ?? [];
 
   function openCreate() {
     setEditTarget(null);
-    form.reset({ title: "", description: "", weightage: 20, reviewPeriod: "monthly" });
+    form.reset({
+      title: "", description: "", weightage: 20, reviewPeriod: "monthly",
+      departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
+    });
     setDialogOpen(true);
   }
 
@@ -451,17 +457,29 @@ function FullKras() {
                 )} />
                 <FormField control={form.control} name="departmentId" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select dept." /></SelectTrigger></FormControl>
+                    <Select
+                      value={field.value?.toString() ?? ""}
+                      onValueChange={(v) => {
+                        field.onChange(Number(v));
+                        form.setValue("employeeId", undefined);
+                      }}
+                    >
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select dept." /></SelectTrigger></FormControl>
                       <SelectContent>{departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
                     </Select><FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="employeeId" render={({ field }) => (
                   <FormItem><FormLabel>Assign to Employee</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : undefined)}><FormControl><SelectTrigger><SelectValue placeholder="Dept-wide" /></SelectTrigger></FormControl>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v === "dept-wide" ? undefined : Number(v))}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedDeptId ? "Dept-wide" : "Select a department first"} />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         <SelectItem value="dept-wide">Dept-wide</SelectItem>
-                        {employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
+                        {deptEmployees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
                       </SelectContent>
                     </Select><FormMessage />
                   </FormItem>
