@@ -814,14 +814,12 @@ function HodKras() {
   const createKra = useCreateKra();
   const updateKra = useUpdateKra();
   const deleteKra = useDeleteKra();
-  const scoreKra = useScoreKra();
   const approveKra = useApproveKraClosure();
 
   const [confirmSubmitId, setConfirmSubmitId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<KraRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<KraRow | null>(null);
-  const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [qDates, setQDates] = useState(["", "", "", ""]);
   const [qDateErrors, setQDateErrors] = useState(["", "", "", ""]);
 
@@ -829,7 +827,6 @@ function HodKras() {
     resolver: zodResolver(kraSchema),
     defaultValues: { title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "" },
   });
-  const scoreForm = useForm<ScoreForm>({ resolver: zodResolver(scoreSchema), defaultValues: { achievementPct: 0 } });
 
   const selectedDeptId = form.watch("departmentId");
   const watchedFrequency = form.watch("frequency");
@@ -888,13 +885,6 @@ function HodKras() {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "KRA created" }); },
       });
     }
-  }
-
-  function onScoreSubmit(values: ScoreForm) {
-    if (!scoreTarget) return;
-    scoreKra.mutate({ id: scoreTarget.id, data: values }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setScoreTarget(null); toast({ title: "Achievement score updated" }); },
-    });
   }
 
   function confirmDelete() {
@@ -1016,7 +1006,6 @@ function HodKras() {
             showDeptColumn={false}
             onEdit={openEdit}
             onDelete={setDeleteTarget}
-            onScore={(kra) => { setScoreTarget(kra); scoreForm.reset({ achievementPct: kra.achievementPct ?? 0 }); }}
           />
         </TabsContent>
       </Tabs>
@@ -1044,27 +1033,6 @@ function HodKras() {
         lockDepartment
       />
 
-      <Dialog open={!!scoreTarget} onOpenChange={(open) => !open && setScoreTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Update Achievement Score</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">{scoreTarget?.title}</p>
-          <Form {...scoreForm}>
-            <form onSubmit={scoreForm.handleSubmit(onScoreSubmit)} className="space-y-4">
-              <FormField control={scoreForm.control} name="achievementPct" render={({ field }) => (
-                <FormItem><FormLabel>Achievement (%)</FormLabel>
-                  <FormControl><Input type="number" min={0} max={100} {...field} onChange={(e) => field.onChange(Number(e.target.value))} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setScoreTarget(null)}>Cancel</Button>
-                <Button type="submit" disabled={scoreKra.isPending}>Update Score</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1090,7 +1058,7 @@ function TeamKraTable({
   showDeptColumn: boolean;
   onEdit: (kra: KraRow) => void;
   onDelete: (kra: KraRow) => void;
-  onScore: (kra: KraRow) => void;
+  onScore?: (kra: KraRow) => void;
 }) {
   const colCount = showDeptColumn ? 9 : 8;
   return (
@@ -1160,10 +1128,14 @@ function TeamKraTable({
                         <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onScore(kra)}>
-                          <Star className="mr-2 h-4 w-4" /> Update Score
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+                        {onScore && (
+                          <>
+                            <DropdownMenuItem onClick={() => onScore(kra)}>
+                              <Star className="mr-2 h-4 w-4" /> Update Score
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
                         <DropdownMenuItem onClick={() => onEdit(kra)}>
                           <Pencil className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
@@ -1361,14 +1333,12 @@ function FullKras() {
   const createKra = useCreateKra();
   const updateKra = useUpdateKra();
   const deleteKra = useDeleteKra();
-  const scoreKra = useScoreKra();
   const approveKra = useApproveKraClosure();
   const hrApproveKraMutation = useHrApproveKra();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<KraRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<KraRow | null>(null);
-  const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [filterDept, setFilterDept] = useState("all");
   const [filterEmp, setFilterEmp] = useState("all");
   const [qDates, setQDates] = useState(["", "", "", ""]);
@@ -1378,7 +1348,6 @@ function FullKras() {
     resolver: zodResolver(kraSchema),
     defaultValues: { title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "" },
   });
-  const scoreForm = useForm<ScoreForm>({ resolver: zodResolver(scoreSchema), defaultValues: { achievementPct: 0 } });
 
   const selectedDeptId = form.watch("departmentId");
   const watchedFrequency = form.watch("frequency");
@@ -1438,13 +1407,6 @@ function FullKras() {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "KRA created" }); },
       });
     }
-  }
-
-  function onScoreSubmit(values: ScoreForm) {
-    if (!scoreTarget) return;
-    scoreKra.mutate({ id: scoreTarget.id, data: values }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setScoreTarget(null); toast({ title: "Achievement score updated" }); },
-    });
   }
 
   function confirmDelete() {
@@ -1591,7 +1553,6 @@ function FullKras() {
         showDeptColumn={user?.role !== "hod"}
         onEdit={openEdit}
         onDelete={setDeleteTarget}
-        onScore={(kra) => { setScoreTarget(kra); scoreForm.reset({ achievementPct: kra.achievementPct ?? 0 }); }}
       />
 
       <KraFormDialog
@@ -1601,27 +1562,6 @@ function FullKras() {
         qDateErrors={qDateErrors} setQDateErrors={setQDateErrors}
         onSubmit={onSubmit} isPending={createKra.isPending || updateKra.isPending}
       />
-
-      <Dialog open={!!scoreTarget} onOpenChange={(open) => !open && setScoreTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Update Achievement Score</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">{scoreTarget?.title}</p>
-          <Form {...scoreForm}>
-            <form onSubmit={scoreForm.handleSubmit(onScoreSubmit)} className="space-y-4">
-              <FormField control={scoreForm.control} name="achievementPct" render={({ field }) => (
-                <FormItem><FormLabel>Achievement (%)</FormLabel>
-                  <FormControl><Input type="number" min={0} max={100} {...field} onChange={(e) => field.onChange(Number(e.target.value))} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setScoreTarget(null)}>Cancel</Button>
-                <Button type="submit" disabled={scoreKra.isPending}>Update Score</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

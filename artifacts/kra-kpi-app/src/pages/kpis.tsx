@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useListKpis,
   useListEmployees,
@@ -14,39 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Star, Wand2 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { MoreHorizontal, Trash2, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
-
-const MONTHS = [
-  { value: 1, label: "January" }, { value: 2, label: "February" }, { value: 3, label: "March" },
-  { value: 4, label: "April" }, { value: 5, label: "May" }, { value: 6, label: "June" },
-  { value: 7, label: "July" }, { value: 8, label: "August" }, { value: 9, label: "September" },
-  { value: 10, label: "October" }, { value: 11, label: "November" }, { value: 12, label: "December" },
-];
-
-const scoreField = z.number().min(0).max(100);
-const kpiSchema = z.object({
-  employeeId: z.number({ required_error: "Employee required" }),
-  month: z.number({ required_error: "Month required" }),
-  year: z.number({ required_error: "Year required" }),
-  kraAchievement: scoreField,
-  taskCompletion: scoreField,
-  productivity: scoreField,
-  punctuality: scoreField,
-  discipline: scoreField,
-});
-type KpiFormData = z.infer<typeof kpiSchema>;
 
 const ratingConfig: Record<string, { label: string; className: string }> = {
   "Outstanding":          { label: "Outstanding",       className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
@@ -57,24 +31,6 @@ const ratingConfig: Record<string, { label: string; className: string }> = {
 };
 
 const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-function ScoreInput({ label, name, form }: { label: string; name: keyof KpiFormData; form: ReturnType<typeof useForm<KpiFormData>> }) {
-  return (
-    <FormField control={form.control} name={name} render={({ field }) => (
-      <FormItem>
-        <FormLabel className="text-xs">{label}</FormLabel>
-        <FormControl>
-          <div className="flex items-center gap-2">
-            <Input type="number" min={0} max={100} {...field} onChange={(e) => field.onChange(Number(e.target.value))} className="w-20" />
-            <span className="text-sm text-muted-foreground">/ 100</span>
-          </div>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )} />
-  );
-}
 
 type KpiRow = {
   id: number; employeeId: number; employeeName?: string | null; departmentId?: number; departmentName?: string | null;
@@ -94,25 +50,41 @@ export default function KPIs() {
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
   const { data: scoreWeights } = useGetScoreWeights();
-  const createKpi = useCreateKpi();
   const deleteKpi = useDeleteKpi();
-  const calculateKpi = useCalculateKpi();
+  const { mutateAsync: calculateKpiAsync } = useCalculateKpi();
+  const { mutateAsync: createKpiAsync } = useCreateKpi();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KpiRow | null>(null);
   const [filterEmp, setFilterEmp] = useState("all");
   const [filterDept, setFilterDept] = useState("all");
+  const hasAutoCalced = useRef(false);
 
-  const form = useForm<KpiFormData>({
-    resolver: zodResolver(kpiSchema),
-    defaultValues: { month: new Date().getMonth() + 1, year: currentYear, kraAchievement: 0, taskCompletion: 0, productivity: 0, punctuality: 0, discipline: 0 },
-  });
+  const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
 
-  function onSubmit(values: KpiFormData) {
-    createKpi.mutate({ data: values }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) }); setDialogOpen(false); toast({ title: "KPI record saved" }); },
-    });
-  }
+  // Auto-calculate & save KPI scores for all employees on page load (once per session)
+  useEffect(() => {
+    if (isEmployee || !employees || employees.length === 0 || hasAutoCalced.current) return;
+    hasAutoCalced.current = true;
+    const month = new Date().getMonth() + 1;
+    const year = new Date().getFullYear();
+    const existingKeys = new Set((kpis ?? []).map((k) => `${k.employeeId}-${k.month}-${k.year}`));
+    const toCalc = employees.filter((e) => !existingKeys.has(`${e.id}-${month}-${year}`));
+    if (toCalc.length === 0) return;
+    (async () => {
+      let saved = 0;
+      await Promise.all(toCalc.map(async (emp) => {
+        try {
+          const result = await calculateKpiAsync({ data: { employeeId: emp.id, month, year } });
+          await createKpiAsync({ data: { employeeId: emp.id, month, year, kraAchievement: result.kraAchievement, taskCompletion: result.taskCompletion, productivity: 0, punctuality: 0, discipline: 0 } });
+          saved++;
+        } catch { /* skip individual failures */ }
+      }));
+      if (saved > 0) {
+        queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
+        toast({ title: `KPI scores auto-calculated for ${saved} employee(s)` });
+      }
+    })();
+  }, [employees, kpis]);
 
   function confirmDelete() {
     if (!deleteTarget) return;
@@ -127,30 +99,6 @@ export default function KPIs() {
     return true;
   });
 
-  const watched = form.watch();
-  const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
-  const previewScore =
-    watched.kraAchievement * (w.kraWeight / 100) +
-    watched.taskCompletion * (w.taskCompletionWeight / 100) +
-    watched.productivity * (w.productivityWeight / 100) +
-    watched.punctuality * (w.punctualityWeight / 100) +
-    watched.discipline * (w.disciplineWeight / 100);
-
-  function handleAutoCalculate() {
-    const empId = form.getValues("employeeId");
-    const month = form.getValues("month");
-    const year = form.getValues("year");
-    if (!empId) { toast({ title: "Select an employee first", variant: "destructive" }); return; }
-    calculateKpi.mutate({ data: { employeeId: empId, month, year } }, {
-      onSuccess: (result) => {
-        form.setValue("kraAchievement", result.kraAchievement);
-        form.setValue("taskCompletion", result.taskCompletion);
-        toast({ title: "Auto-calculated from KRA & Task data", description: `KRA: ${result.kraAchievement}%  ·  Tasks: ${result.taskCompletion}%` });
-      },
-      onError: () => toast({ title: "Could not auto-calculate", variant: "destructive" }),
-    });
-  }
-
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
       <div className="flex items-center justify-between">
@@ -161,9 +109,7 @@ export default function KPIs() {
           </p>
         </div>
         {!isEmployee && (
-          <Button onClick={() => { form.reset(); setDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Evaluate KPI
-          </Button>
+          <p className="text-xs text-muted-foreground">Scores auto-calculated from KRA &amp; Task records</p>
         )}
       </div>
 
@@ -289,95 +235,18 @@ export default function KPIs() {
         </CardContent>
       </Card>
 
-      {!isEmployee && (
-        <>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Evaluate Employee KPI</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <FormField control={form.control} name="employeeId" render={({ field }) => (
-                      <FormItem className="col-span-3"><FormLabel>Employee</FormLabel>
-                        <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger></FormControl>
-                          <SelectContent>{employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="month" render={({ field }) => (
-                      <FormItem className="col-span-2"><FormLabel>Month</FormLabel>
-                        <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>{MONTHS.map((m) => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="year" render={({ field }) => (
-                      <FormItem><FormLabel>Year</FormLabel>
-                        <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>{YEARS.map((y) => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage />
-                      </FormItem>
-                    )} />
-                  </div>
-
-                  {/* Auto-calculate banner */}
-                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2">
-                    <Wand2 className="h-4 w-4 text-blue-500 shrink-0" />
-                    <div className="flex-1 text-xs text-blue-700 dark:text-blue-300">
-                      Auto-fill KRA achievement &amp; task completion from actual records
-                    </div>
-                    <Button
-                      type="button" size="sm" variant="outline"
-                      className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-700"
-                      disabled={calculateKpi.isPending}
-                      onClick={handleAutoCalculate}
-                    >
-                      {calculateKpi.isPending ? "Calculating…" : "Auto-Calculate"}
-                    </Button>
-                  </div>
-
-                  <div className="rounded-lg border p-4 space-y-3">
-                    <div className="text-sm font-medium text-muted-foreground mb-1">Score Components</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <ScoreInput label={`KRA Achievement (${w.kraWeight}%)`} name="kraAchievement" form={form} />
-                      <ScoreInput label={`Task Completion (${w.taskCompletionWeight}%)`} name="taskCompletion" form={form} />
-                      <ScoreInput label={`Productivity (${w.productivityWeight}%)`} name="productivity" form={form} />
-                      <ScoreInput label={`Punctuality (${w.punctualityWeight}%)`} name="punctuality" form={form} />
-                      <ScoreInput label={`Discipline (${w.disciplineWeight}%)`} name="discipline" form={form} />
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-muted p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium">Calculated Total Score</span>
-                    <span className="text-lg font-bold text-primary">{previewScore.toFixed(1)}</span>
-                  </div>
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button type="submit" disabled={createKpi.isPending}>Save KPI Record</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete KPI record?</AlertDialogTitle>
-                <AlertDialogDescription>Delete the KPI record for <strong>{deleteTarget?.employeeName}</strong>?</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </>
-      )}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete KPI record?</AlertDialogTitle>
+            <AlertDialogDescription>Delete the KPI record for <strong>{deleteTarget?.employeeName}</strong>?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
