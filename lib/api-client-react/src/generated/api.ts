@@ -22,6 +22,8 @@ import type {
 import type {
   ActivityItem,
   ApproveCloseInput,
+  BulkUploadEmployeesBody,
+  BulkUploadResult,
   CalculateKpiBatch201,
   Company,
   CompanyInput,
@@ -1483,6 +1485,77 @@ export const useCreateEmployee = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateEmployeeMutationOptions(options));
+    }
+
+export const getBulkUploadEmployeesUrl = () => {
+
+
+
+
+  return `/api/employees/bulk-upload`
+}
+
+/**
+ * @summary Bulk upload employees from parsed CSV rows
+ */
+export const bulkUploadEmployees = async (bulkUploadEmployeesBody: BulkUploadEmployeesBody, options?: RequestInit): Promise<BulkUploadResult> => {
+
+  return customFetch<BulkUploadResult>(getBulkUploadEmployeesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkUploadEmployeesBody,)
+  }
+);}
+
+
+
+
+export const getBulkUploadEmployeesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUploadEmployees>>, TError,{data: BodyType<BulkUploadEmployeesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkUploadEmployees>>, TError,{data: BodyType<BulkUploadEmployeesBody>}, TContext> => {
+
+const mutationKey = ['bulkUploadEmployees'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkUploadEmployees>>, {data: BodyType<BulkUploadEmployeesBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkUploadEmployees(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkUploadEmployeesMutationResult = NonNullable<Awaited<ReturnType<typeof bulkUploadEmployees>>>
+    export type BulkUploadEmployeesMutationBody = BodyType<BulkUploadEmployeesBody>
+    export type BulkUploadEmployeesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bulk upload employees from parsed CSV rows
+ */
+export const useBulkUploadEmployees = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUploadEmployees>>, TError,{data: BodyType<BulkUploadEmployeesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkUploadEmployees>>,
+        TError,
+        {data: BodyType<BulkUploadEmployeesBody>},
+        TContext
+      > => {
+      return useMutation(getBulkUploadEmployeesMutationOptions(options));
     }
 
 export const getGetEmployeeUrl = (id: number,) => {

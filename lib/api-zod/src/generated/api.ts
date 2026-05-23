@@ -293,6 +293,35 @@ export const CreateEmployeeBody = zod.object({
 
 
 /**
+ * @summary Bulk upload employees from parsed CSV rows
+ */
+export const BulkUploadEmployeesBody = zod.object({
+  "rows": zod.array(zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.string(),
+  "department": zod.string(),
+  "designation": zod.string().optional(),
+  "company": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "joiningDate": zod.string().optional()
+}))
+})
+
+export const BulkUploadEmployeesResponse = zod.object({
+  "total": zod.number(),
+  "created": zod.number(),
+  "failed": zod.number(),
+  "errors": zod.array(zod.object({
+  "row": zod.number(),
+  "email": zod.string().optional(),
+  "name": zod.string().optional(),
+  "error": zod.string()
+}))
+})
+
+
+/**
  * @summary Get an employee
  */
 export const GetEmployeeParams = zod.object({

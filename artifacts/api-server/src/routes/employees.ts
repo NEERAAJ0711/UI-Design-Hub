@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { createHash } from "crypto";
 import {
   CreateEmployeeBody,
   UpdateEmployeeBody,
@@ -9,6 +10,22 @@ import {
   UpdateEmployeeParams,
   ListEmployeesQueryParams,
 } from "@workspace/api-zod";
+import { z } from "zod";
+
+const BulkEmployeeRowSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.enum(["management", "hod", "manager", "employee"]).default("employee"),
+  department: z.string().min(1),
+  designation: z.string().optional(),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  joiningDate: z.string().optional(),
+});
+
+function hashPassword(plain: string): string {
+  return createHash("sha256").update(plain).digest("hex");
+}
 
 const router = Router();
 
@@ -58,6 +75,66 @@ router.post("/employees", async (req, res) => {
     managerName: null,
     createdAt: emp.createdAt.toISOString(),
   });
+});
+
+router.post("/employees/bulk-upload", async (req, res) => {
+  const { rows } = req.body as { rows: unknown[] };
+  if (!Array.isArray(rows) || rows.length === 0) {
+    res.status(400).json({ error: "rows must be a non-empty array" });
+    return;
+  }
+
+  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
+  const deptByName = new Map(depts.map((d) => [d.name.toLowerCase().trim(), d.id]));
+
+  const DEFAULT_PASSWORD_HASH = hashPassword("Password@123");
+
+  let created = 0;
+  const errors: Array<{ row: number; name?: string; email?: string; error: string }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = i + 1;
+    const parsed = BulkEmployeeRowSchema.safeParse(rows[i]);
+    if (!parsed.success) {
+      const msg = parsed.error.issues.map((e: { message: string }) => e.message).join("; ");
+      const raw = rows[i] as Record<string, unknown>;
+      errors.push({ row: rowNum, name: String(raw.name ?? ""), email: String(raw.email ?? ""), error: msg });
+      continue;
+    }
+    const data = parsed.data;
+    const deptId = deptByName.get(data.department.toLowerCase().trim());
+    if (!deptId) {
+      errors.push({ row: rowNum, name: data.name, email: data.email, error: `Department "${data.department}" not found` });
+      continue;
+    }
+    try {
+      const [emp] = await db.insert(employeesTable).values({
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        designation: data.designation || undefined,
+        company: data.company || undefined,
+        phone: data.phone || undefined,
+        joiningDate: data.joiningDate || undefined,
+        departmentId: deptId,
+        passwordHash: DEFAULT_PASSWORD_HASH,
+      }).returning();
+      await db.insert(activityLogTable).values({
+        type: "employee_added",
+        description: `Bulk upload: ${emp.name} added to ${data.department}`,
+        actorId: emp.id,
+        entityId: emp.id,
+        entityType: "employee",
+      });
+      created++;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Insert failed";
+      const isDuplicate = msg.includes("unique") || msg.includes("duplicate");
+      errors.push({ row: rowNum, name: data.name, email: data.email, error: isDuplicate ? "Email already exists" : msg });
+    }
+  }
+
+  res.json({ total: rows.length, created, failed: errors.length, errors });
 });
 
 router.get("/employees/:id", async (req, res) => {

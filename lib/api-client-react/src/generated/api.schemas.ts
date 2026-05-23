@@ -152,6 +152,31 @@ export interface EmployeeInput {
   joiningDate?: string;
 }
 
+export interface BulkEmployeeRow {
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+  designation?: string;
+  company?: string;
+  phone?: string;
+  joiningDate?: string;
+}
+
+export type BulkUploadResultErrorsItem = {
+  row: number;
+  email?: string;
+  name?: string;
+  error: string;
+};
+
+export interface BulkUploadResult {
+  total: number;
+  created: number;
+  failed: number;
+  errors: BulkUploadResultErrorsItem[];
+}
+
 export type EmployeeUpdateRole = typeof EmployeeUpdateRole[keyof typeof EmployeeUpdateRole];
 
 
@@ -737,6 +762,10 @@ export type Logout200 = {
 export type ListEmployeesParams = {
 departmentId?: number;
 role?: string;
+};
+
+export type BulkUploadEmployeesBody = {
+  rows: BulkEmployeeRow[];
 };
 
 export type ListKrasParams = {
