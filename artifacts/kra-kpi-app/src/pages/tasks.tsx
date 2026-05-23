@@ -294,13 +294,19 @@ function FullTasks() {
     defaultValues: { title: "", description: "", priority: "medium", dueDate: "", isRecurring: false },
   });
   const isRecurring = form.watch("isRecurring");
+  const selectedDeptId = form.watch("departmentId");
+  const deptEmployees = employees?.filter((e) => selectedDeptId ? e.departmentId === selectedDeptId : true);
 
   const pendingTaskApprovals = pendingData?.tasks ?? [];
   const canManage = user?.role !== "employee";
 
   function openCreate() {
     setEditTarget(null);
-    form.reset({ title: "", description: "", priority: "medium", dueDate: "", isRecurring: false });
+    form.reset({
+      title: "", description: "", priority: "medium", dueDate: "", isRecurring: false,
+      createdById: user!.id,
+      departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
+    });
     setDialogOpen(true);
   }
 
@@ -552,6 +558,38 @@ function FullTasks() {
                 <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the task..." rows={3} {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="grid grid-cols-2 gap-4">
+                {/* Department first — drives employee filtering */}
+                <FormField control={form.control} name="departmentId" render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Department</FormLabel>
+                    <Select
+                      value={field.value?.toString() ?? ""}
+                      onValueChange={(v) => {
+                        field.onChange(Number(v));
+                        form.setValue("assignedToId", undefined as unknown as number);
+                      }}
+                    >
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                      <SelectContent>{departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+                {/* Assign To — filtered by selected department */}
+                <FormField control={form.control} name="assignedToId" render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Assign To</FormLabel>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedDeptId ? "Select employee" : "Select a department first"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {deptEmployees?.length
+                          ? deptEmployees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)
+                          : <SelectItem value="none" disabled>No employees in this department</SelectItem>}
+                      </SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="priority" render={({ field }) => (
                   <FormItem><FormLabel>Priority</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
@@ -561,27 +599,6 @@ function FullTasks() {
                 )} />
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
                   <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="assignedToId" render={({ field }) => (
-                  <FormItem><FormLabel>Assign To</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger></FormControl>
-                      <SelectContent>{employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="createdById" render={({ field }) => (
-                  <FormItem><FormLabel>Created By</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select creator" /></SelectTrigger></FormControl>
-                      <SelectContent>{employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="departmentId" render={({ field }) => (
-                  <FormItem className="col-span-2"><FormLabel>Department</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
-                      <SelectContent>{departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="isRecurring" render={({ field }) => (
