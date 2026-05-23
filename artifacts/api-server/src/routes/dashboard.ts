@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, tasksTable, employeesTable, departmentsTable, kpisTable, krasTable, activityLogTable } from "@workspace/db";
+import { db, tasksTable, employeesTable, departmentsTable, kpisTable, krasTable, activityLogTable, holidaysTable } from "@workspace/db";
 import { eq, count, sql, isNotNull, and } from "drizzle-orm";
+import { approvalTimerInfo } from "../utils/working-hours";
 import { GetEmployeeDashboardSummaryQueryParams, GetPendingApprovalsQueryParams } from "@workspace/api-zod";
 
 const router = Router();
@@ -211,11 +212,6 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
 
   const kraStatusValues = role === "hod" ? ["submitted", "manager_approved"] : ["submitted"];
 
-  const kraConditions: ReturnType<typeof eq>[] = [];
-  for (const status of kraStatusValues) {
-    kraConditions.push(eq(krasTable.kraStatus, status));
-  }
-
   const allKras = await db.select().from(krasTable);
   const pendingKras = allKras.filter((k) => {
     if (!kraStatusValues.includes(k.kraStatus)) return false;
@@ -235,39 +231,67 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
   const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
   const deptMap = new Map(depts.map((d) => [d.id, d.name]));
 
-  // KRAs pending HR approval — visible to HR department users
+  // KRAs pending HR approval
   const allPendingHrKras = await db.select().from(krasTable).where(eq(krasTable.hrApprovalStatus, "pending_hr"));
 
+  // Load holidays for working-hours calculation
+  const holidays = await db.select({ date: holidaysTable.date }).from(holidaysTable);
+  const holidaySet = new Set(holidays.map((h) => h.date));
+  const now = new Date();
+
   res.json({
-    kras: pendingKras.map((k) => ({
-      id: k.id,
-      title: k.title,
-      employeeId: k.employeeId ?? 0,
-      employeeName: k.employeeId ? (empMap.get(k.employeeId) ?? "") : "",
-      departmentName: deptMap.get(k.departmentId) ?? "",
-      achievementPct: k.achievementPct ?? null,
-      kraStatus: k.kraStatus,
-      submittedAt: k.submittedAt?.toISOString() ?? null,
-    })),
-    tasks: pendingTasks.map((t) => ({
-      id: t.id,
-      title: t.title,
-      assignedToId: t.assignedToId,
-      assignedToName: empMap.get(t.assignedToId) ?? "",
-      departmentName: deptMap.get(t.departmentId) ?? "",
-      status: t.status,
-      requestedStatus: t.requestedStatus!,
-      progressPct: t.progressPct,
-    })),
-    krasPendingHrApproval: allPendingHrKras.map((k) => ({
-      id: k.id,
-      title: k.title,
-      description: k.description ?? null,
-      weightage: k.weightage,
-      departmentName: deptMap.get(k.departmentId) ?? "",
-      reviewPeriod: k.reviewPeriod,
-      createdAt: k.createdAt.toISOString(),
-    })),
+    kras: pendingKras.map((k) => {
+      const pendingAt = k.kraStatus === "manager_approved"
+        ? k.managerApprovedAt ?? k.submittedAt
+        : k.submittedAt;
+      const timer = approvalTimerInfo(pendingAt, now, holidaySet);
+      return {
+        id: k.id,
+        title: k.title,
+        employeeId: k.employeeId ?? 0,
+        employeeName: k.employeeId ? (empMap.get(k.employeeId) ?? "") : "",
+        departmentName: deptMap.get(k.departmentId) ?? "",
+        achievementPct: k.achievementPct ?? null,
+        kraStatus: k.kraStatus,
+        submittedAt: k.submittedAt?.toISOString() ?? null,
+        pendingAt: pendingAt?.toISOString() ?? null,
+        workingHoursElapsed: timer.workingHoursElapsed,
+        isOverdue: timer.isOverdue,
+      };
+    }),
+    tasks: pendingTasks.map((t) => {
+      const pendingAt = t.statusRequestedAt;
+      const timer = approvalTimerInfo(pendingAt, now, holidaySet);
+      return {
+        id: t.id,
+        title: t.title,
+        assignedToId: t.assignedToId,
+        assignedToName: empMap.get(t.assignedToId) ?? "",
+        departmentName: deptMap.get(t.departmentId) ?? "",
+        status: t.status,
+        requestedStatus: t.requestedStatus!,
+        progressPct: t.progressPct,
+        pendingAt: pendingAt?.toISOString() ?? null,
+        workingHoursElapsed: timer.workingHoursElapsed,
+        isOverdue: timer.isOverdue,
+      };
+    }),
+    krasPendingHrApproval: allPendingHrKras.map((k) => {
+      const pendingAt = k.createdAt;
+      const timer = approvalTimerInfo(pendingAt, now, holidaySet);
+      return {
+        id: k.id,
+        title: k.title,
+        description: k.description ?? null,
+        weightage: k.weightage,
+        departmentName: deptMap.get(k.departmentId) ?? "",
+        reviewPeriod: k.reviewPeriod,
+        createdAt: k.createdAt.toISOString(),
+        pendingAt: pendingAt.toISOString(),
+        workingHoursElapsed: timer.workingHoursElapsed,
+        isOverdue: timer.isOverdue,
+      };
+    }),
   });
 });
 

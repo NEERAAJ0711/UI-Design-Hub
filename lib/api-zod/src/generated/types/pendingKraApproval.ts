@@ -17,4 +17,8 @@ export interface PendingKraApproval {
   kraStatus: string;
   /** @nullable */
   submittedAt?: string | null;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }

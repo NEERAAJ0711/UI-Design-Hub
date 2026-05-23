@@ -7,3 +7,5 @@ export * from "./task_comments";
 export * from "./activity_log";
 export * from "./designations";
 export * from "./companies";
+export * from "./score_weights";
+export * from "./holidays";

@@ -27,6 +27,10 @@ tags:
     description: Designation master management
   - name: companies
     description: Company master management
+  - name: holidays
+    description: Holiday calendar management
+  - name: score-weights
+    description: KPI score component weights
 
 paths:
   # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1099,6 +1103,98 @@ paths:
               schema:
                 $ref: "#/components/schemas/PendingApprovals"
 
+  /holidays:
+    get:
+      operationId: listHolidays
+      tags: [holidays]
+      summary: List all holidays
+      responses:
+        "200":
+          description: List of holidays
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Holiday"
+    post:
+      operationId: createHoliday
+      tags: [holidays]
+      summary: Create a holiday
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HolidayInput"
+      responses:
+        "201":
+          description: Holiday created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Holiday"
+  /holidays/{id}:
+    delete:
+      operationId: deleteHoliday
+      tags: [holidays]
+      summary: Delete a holiday
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+  /score-weights:
+    get:
+      operationId: getScoreWeights
+      tags: [score-weights]
+      summary: Get KPI score component weights
+      responses:
+        "200":
+          description: Score weights configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreWeights"
+    put:
+      operationId: updateScoreWeights
+      tags: [score-weights]
+      summary: Update KPI score component weights (must sum to 100)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreWeightsInput"
+      responses:
+        "200":
+          description: Updated score weights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreWeights"
+  /kpis/calculate:
+    post:
+      operationId: calculateKpi
+      tags: [kpis]
+      summary: Auto-calculate KPI from KRA achievement and task completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KpiCalculateInput"
+      responses:
+        "201":
+          description: Calculated/updated KPI record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kpi"
+
 components:
   schemas:
     LoginInput:
@@ -1513,41 +1609,50 @@ components:
 
     PendingKraApproval:
       type: object
-      required: [id, title, employeeId, employeeName, departmentName, kraStatus]
+      required: [id, title, employeeId, employeeName, departmentName, kraStatus, workingHoursElapsed, isOverdue]
       properties:
-        id:             { type: integer }
-        title:          { type: string }
-        employeeId:     { type: integer }
-        employeeName:   { type: string }
-        departmentName: { type: string }
-        achievementPct: { type: ["number", "null"] }
-        kraStatus:      { type: string }
-        submittedAt:    { type: ["string", "null"] }
+        id:                  { type: integer }
+        title:               { type: string }
+        employeeId:          { type: integer }
+        employeeName:        { type: string }
+        departmentName:      { type: string }
+        achievementPct:      { type: ["number", "null"] }
+        kraStatus:           { type: string }
+        submittedAt:         { type: ["string", "null"] }
+        pendingAt:           { type: ["string", "null"] }
+        workingHoursElapsed: { type: number }
+        isOverdue:           { type: boolean }
 
     PendingTaskApproval:
       type: object
-      required: [id, title, assignedToId, assignedToName, departmentName, status, requestedStatus]
+      required: [id, title, assignedToId, assignedToName, departmentName, status, requestedStatus, workingHoursElapsed, isOverdue]
       properties:
-        id:               { type: integer }
-        title:            { type: string }
-        assignedToId:     { type: integer }
-        assignedToName:   { type: string }
-        departmentName:   { type: string }
-        status:           { type: string }
-        requestedStatus:  { type: string }
-        progressPct:      { type: integer }
+        id:                  { type: integer }
+        title:               { type: string }
+        assignedToId:        { type: integer }
+        assignedToName:      { type: string }
+        departmentName:      { type: string }
+        status:              { type: string }
+        requestedStatus:     { type: string }
+        progressPct:         { type: integer }
+        pendingAt:           { type: ["string", "null"] }
+        workingHoursElapsed: { type: number }
+        isOverdue:           { type: boolean }
 
     HrPendingKraApproval:
       type: object
-      required: [id, title, departmentName, createdAt]
+      required: [id, title, departmentName, createdAt, workingHoursElapsed, isOverdue]
       properties:
-        id:             { type: integer }
-        title:          { type: string }
-        description:    { type: ["string", "null"] }
-        weightage:      { type: number }
-        departmentName: { type: string }
-        reviewPeriod:   { type: string }
-        createdAt:      { type: string }
+        id:                  { type: integer }
+        title:               { type: string }
+        description:         { type: ["string", "null"] }
+        weightage:           { type: number }
+        departmentName:      { type: string }
+        reviewPeriod:        { type: string }
+        createdAt:           { type: string }
+        pendingAt:           { type: ["string", "null"] }
+        workingHoursElapsed: { type: number }
+        isOverdue:           { type: boolean }
 
     PendingApprovals:
       type: object
@@ -1565,3 +1670,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HrPendingKraApproval"
+
+    Holiday:
+      type: object
+      required: [id, date, name, createdAt]
+      properties:
+        id:        { type: integer }
+        date:      { type: string }
+        name:      { type: string }
+        createdAt: { type: string }
+
+    HolidayInput:
+      type: object
+      required: [date, name]
+      properties:
+        date: { type: string }
+        name: { type: string }
+
+    ScoreWeights:
+      type: object
+      required: [id, kraWeight, taskCompletionWeight, productivityWeight, punctualityWeight, disciplineWeight]
+      properties:
+        id:                   { type: integer }
+        kraWeight:            { type: number }
+        taskCompletionWeight: { type: number }
+        productivityWeight:   { type: number }
+        punctualityWeight:    { type: number }
+        disciplineWeight:     { type: number }
+
+    ScoreWeightsInput:
+      type: object
+      required: [kraWeight, taskCompletionWeight, productivityWeight, punctualityWeight, disciplineWeight]
+      properties:
+        kraWeight:            { type: number }
+        taskCompletionWeight: { type: number }
+        productivityWeight:   { type: number }
+        punctualityWeight:    { type: number }
+        disciplineWeight:     { type: number }
+
+    KpiCalculateInput:
+      type: object
+      required: [employeeId, month, year]
+      properties:
+        employeeId: { type: integer }
+        month:      { type: integer }
+        year:       { type: integer }

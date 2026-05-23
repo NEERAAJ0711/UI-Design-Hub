@@ -9,6 +9,8 @@ import tasksRouter from "./tasks";
 import dashboardRouter from "./dashboard";
 import designationsRouter from "./designations";
 import companiesRouter from "./companies";
+import holidaysRouter from "./holidays";
+import scoreWeightsRouter from "./score-weights";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(tasksRouter);
 router.use(dashboardRouter);
 router.use(designationsRouter);
 router.use(companiesRouter);
+router.use(holidaysRouter);
+router.use(scoreWeightsRouter);
 
 export default router;

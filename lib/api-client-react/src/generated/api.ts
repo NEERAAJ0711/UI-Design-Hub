@@ -43,8 +43,11 @@ import type {
   GetRecentActivityParams,
   GetTopPerformersParams,
   HealthStatus,
+  Holiday,
+  HolidayInput,
   HrApproveKraInput,
   Kpi,
+  KpiCalculateInput,
   KpiInput,
   KpiUpdate,
   Kra,
@@ -58,6 +61,8 @@ import type {
   LoginInput,
   Logout200,
   PendingApprovals,
+  ScoreWeights,
+  ScoreWeightsInput,
   Task,
   TaskComment,
   TaskCommentInput,
@@ -4113,4 +4118,441 @@ export function useGetPendingApprovals<TData = Awaited<ReturnType<typeof getPend
 
 
 
+
+export const getListHolidaysUrl = () => {
+
+
+
+
+  return `/api/holidays`
+}
+
+/**
+ * @summary List all holidays
+ */
+export const listHolidays = async ( options?: RequestInit): Promise<Holiday[]> => {
+
+  return customFetch<Holiday[]>(getListHolidaysUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHolidaysQueryKey = () => {
+    return [
+    `/api/holidays`
+    ] as const;
+    }
+
+
+export const getListHolidaysQueryOptions = <TData = Awaited<ReturnType<typeof listHolidays>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHolidays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHolidaysQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHolidays>>> = ({ signal }) => listHolidays({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHolidays>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHolidaysQueryResult = NonNullable<Awaited<ReturnType<typeof listHolidays>>>
+export type ListHolidaysQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all holidays
+ */
+
+export function useListHolidays<TData = Awaited<ReturnType<typeof listHolidays>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHolidays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHolidaysQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateHolidayUrl = () => {
+
+
+
+
+  return `/api/holidays`
+}
+
+/**
+ * @summary Create a holiday
+ */
+export const createHoliday = async (holidayInput: HolidayInput, options?: RequestInit): Promise<Holiday> => {
+
+  return customFetch<Holiday>(getCreateHolidayUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      holidayInput,)
+  }
+);}
+
+
+
+
+export const getCreateHolidayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHoliday>>, TError,{data: BodyType<HolidayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createHoliday>>, TError,{data: BodyType<HolidayInput>}, TContext> => {
+
+const mutationKey = ['createHoliday'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHoliday>>, {data: BodyType<HolidayInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createHoliday(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof createHoliday>>>
+    export type CreateHolidayMutationBody = BodyType<HolidayInput>
+    export type CreateHolidayMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a holiday
+ */
+export const useCreateHoliday = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHoliday>>, TError,{data: BodyType<HolidayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createHoliday>>,
+        TError,
+        {data: BodyType<HolidayInput>},
+        TContext
+      > => {
+      return useMutation(getCreateHolidayMutationOptions(options));
+    }
+
+export const getDeleteHolidayUrl = (id: number,) => {
+
+
+
+
+  return `/api/holidays/${id}`
+}
+
+/**
+ * @summary Delete a holiday
+ */
+export const deleteHoliday = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteHolidayUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteHolidayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHoliday>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteHoliday>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteHoliday'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteHoliday>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteHoliday(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof deleteHoliday>>>
+
+    export type DeleteHolidayMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a holiday
+ */
+export const useDeleteHoliday = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHoliday>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteHoliday>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteHolidayMutationOptions(options));
+    }
+
+export const getGetScoreWeightsUrl = () => {
+
+
+
+
+  return `/api/score-weights`
+}
+
+/**
+ * @summary Get KPI score component weights
+ */
+export const getScoreWeights = async ( options?: RequestInit): Promise<ScoreWeights> => {
+
+  return customFetch<ScoreWeights>(getGetScoreWeightsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoreWeightsQueryKey = () => {
+    return [
+    `/api/score-weights`
+    ] as const;
+    }
+
+
+export const getGetScoreWeightsQueryOptions = <TData = Awaited<ReturnType<typeof getScoreWeights>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoreWeights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoreWeightsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoreWeights>>> = ({ signal }) => getScoreWeights({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoreWeights>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoreWeightsQueryResult = NonNullable<Awaited<ReturnType<typeof getScoreWeights>>>
+export type GetScoreWeightsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get KPI score component weights
+ */
+
+export function useGetScoreWeights<TData = Awaited<ReturnType<typeof getScoreWeights>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoreWeights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoreWeightsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateScoreWeightsUrl = () => {
+
+
+
+
+  return `/api/score-weights`
+}
+
+/**
+ * @summary Update KPI score component weights (must sum to 100)
+ */
+export const updateScoreWeights = async (scoreWeightsInput: ScoreWeightsInput, options?: RequestInit): Promise<ScoreWeights> => {
+
+  return customFetch<ScoreWeights>(getUpdateScoreWeightsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      scoreWeightsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateScoreWeightsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScoreWeights>>, TError,{data: BodyType<ScoreWeightsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateScoreWeights>>, TError,{data: BodyType<ScoreWeightsInput>}, TContext> => {
+
+const mutationKey = ['updateScoreWeights'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateScoreWeights>>, {data: BodyType<ScoreWeightsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateScoreWeights(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateScoreWeightsMutationResult = NonNullable<Awaited<ReturnType<typeof updateScoreWeights>>>
+    export type UpdateScoreWeightsMutationBody = BodyType<ScoreWeightsInput>
+    export type UpdateScoreWeightsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update KPI score component weights (must sum to 100)
+ */
+export const useUpdateScoreWeights = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScoreWeights>>, TError,{data: BodyType<ScoreWeightsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateScoreWeights>>,
+        TError,
+        {data: BodyType<ScoreWeightsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateScoreWeightsMutationOptions(options));
+    }
+
+export const getCalculateKpiUrl = () => {
+
+
+
+
+  return `/api/kpis/calculate`
+}
+
+/**
+ * @summary Auto-calculate KPI from KRA achievement and task completion
+ */
+export const calculateKpi = async (kpiCalculateInput: KpiCalculateInput, options?: RequestInit): Promise<Kpi> => {
+
+  return customFetch<Kpi>(getCalculateKpiUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      kpiCalculateInput,)
+  }
+);}
+
+
+
+
+export const getCalculateKpiMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateKpi>>, TError,{data: BodyType<KpiCalculateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof calculateKpi>>, TError,{data: BodyType<KpiCalculateInput>}, TContext> => {
+
+const mutationKey = ['calculateKpi'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calculateKpi>>, {data: BodyType<KpiCalculateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calculateKpi(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalculateKpiMutationResult = NonNullable<Awaited<ReturnType<typeof calculateKpi>>>
+    export type CalculateKpiMutationBody = BodyType<KpiCalculateInput>
+    export type CalculateKpiMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Auto-calculate KPI from KRA achievement and task completion
+ */
+export const useCalculateKpi = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateKpi>>, TError,{data: BodyType<KpiCalculateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof calculateKpi>>,
+        TError,
+        {data: BodyType<KpiCalculateInput>},
+        TContext
+      > => {
+      return useMutation(getCalculateKpiMutationOptions(options));
+    }
 

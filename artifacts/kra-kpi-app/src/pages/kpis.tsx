@@ -5,6 +5,8 @@ import {
   useListDepartments,
   useCreateKpi,
   useDeleteKpi,
+  useCalculateKpi,
+  useGetScoreWeights,
   getListKpisQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,7 +20,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Star } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Star, Wand2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -91,8 +93,10 @@ export default function KPIs() {
   const { data: kpis, isLoading } = useListKpis(kpiParams, { query: { queryKey: getListKpisQueryKey(kpiParams) } });
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
+  const { data: scoreWeights } = useGetScoreWeights();
   const createKpi = useCreateKpi();
   const deleteKpi = useDeleteKpi();
+  const calculateKpi = useCalculateKpi();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<KpiRow | null>(null);
@@ -124,7 +128,28 @@ export default function KPIs() {
   });
 
   const watched = form.watch();
-  const previewScore = watched.kraAchievement * 0.4 + watched.taskCompletion * 0.3 + watched.productivity * 0.15 + watched.punctuality * 0.1 + watched.discipline * 0.05;
+  const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+  const previewScore =
+    watched.kraAchievement * (w.kraWeight / 100) +
+    watched.taskCompletion * (w.taskCompletionWeight / 100) +
+    watched.productivity * (w.productivityWeight / 100) +
+    watched.punctuality * (w.punctualityWeight / 100) +
+    watched.discipline * (w.disciplineWeight / 100);
+
+  function handleAutoCalculate() {
+    const empId = form.getValues("employeeId");
+    const month = form.getValues("month");
+    const year = form.getValues("year");
+    if (!empId) { toast({ title: "Select an employee first", variant: "destructive" }); return; }
+    calculateKpi.mutate({ data: { employeeId: empId, month, year } }, {
+      onSuccess: (result) => {
+        form.setValue("kraAchievement", result.kraAchievement);
+        form.setValue("taskCompletion", result.taskCompletion);
+        toast({ title: "Auto-calculated from KRA & Task data", description: `KRA: ${result.kraAchievement}%  ·  Tasks: ${result.taskCompletion}%` });
+      },
+      onError: () => toast({ title: "Could not auto-calculate", variant: "destructive" }),
+    });
+  }
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
@@ -268,7 +293,9 @@ export default function KPIs() {
         <>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>Evaluate Employee KPI</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Evaluate Employee KPI</DialogTitle>
+              </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
@@ -297,14 +324,31 @@ export default function KPIs() {
                       </FormItem>
                     )} />
                   </div>
+
+                  {/* Auto-calculate banner */}
+                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2">
+                    <Wand2 className="h-4 w-4 text-blue-500 shrink-0" />
+                    <div className="flex-1 text-xs text-blue-700 dark:text-blue-300">
+                      Auto-fill KRA achievement &amp; task completion from actual records
+                    </div>
+                    <Button
+                      type="button" size="sm" variant="outline"
+                      className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-700"
+                      disabled={calculateKpi.isPending}
+                      onClick={handleAutoCalculate}
+                    >
+                      {calculateKpi.isPending ? "Calculating…" : "Auto-Calculate"}
+                    </Button>
+                  </div>
+
                   <div className="rounded-lg border p-4 space-y-3">
                     <div className="text-sm font-medium text-muted-foreground mb-1">Score Components</div>
                     <div className="grid grid-cols-2 gap-3">
-                      <ScoreInput label="KRA Achievement (40%)" name="kraAchievement" form={form} />
-                      <ScoreInput label="Task Completion (30%)" name="taskCompletion" form={form} />
-                      <ScoreInput label="Productivity (15%)" name="productivity" form={form} />
-                      <ScoreInput label="Punctuality (10%)" name="punctuality" form={form} />
-                      <ScoreInput label="Discipline (5%)" name="discipline" form={form} />
+                      <ScoreInput label={`KRA Achievement (${w.kraWeight}%)`} name="kraAchievement" form={form} />
+                      <ScoreInput label={`Task Completion (${w.taskCompletionWeight}%)`} name="taskCompletion" form={form} />
+                      <ScoreInput label={`Productivity (${w.productivityWeight}%)`} name="productivity" form={form} />
+                      <ScoreInput label={`Punctuality (${w.punctualityWeight}%)`} name="punctuality" form={form} />
+                      <ScoreInput label={`Discipline (${w.disciplineWeight}%)`} name="discipline" form={form} />
                     </div>
                   </div>
                   <div className="rounded-lg bg-muted p-3 flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListEmployees,
   useListDepartments,
@@ -19,11 +19,18 @@ import {
   useCreateCompany,
   useUpdateCompany,
   useDeleteCompany,
+  useListHolidays,
+  useCreateHoliday,
+  useDeleteHoliday,
+  useGetScoreWeights,
+  useUpdateScoreWeights,
   getListEmployeesQueryKey,
   getListDepartmentsQueryKey,
   getListDesignationsQueryKey,
   getListCompaniesQueryKey,
   getGetPendingApprovalsQueryKey,
+  getListHolidaysQueryKey,
+  getGetScoreWeightsQueryKey,
   getListKrasQueryKey,
   getListTasksQueryKey,
 } from "@workspace/api-client-react";
@@ -41,6 +48,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   ShieldAlert, Users, Building2, CheckSquare, Target, Bell, CheckCircle2, XCircle,
   Activity, RefreshCw, Plus, Pencil, Trash2, Briefcase, LayoutList,
+  Settings, CalendarDays, Clock, AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -191,10 +199,15 @@ export default function Admin() {
   const { data: companies, isLoading: loadingComp } = useListCompanies();
   const { data: pendingData, isLoading: loadingPending } = useGetPendingApprovals();
   const { data: recentActivity } = useGetRecentActivity({ limit: 20 });
+  const { data: holidays, isLoading: loadingHolidays } = useListHolidays();
+  const { data: scoreWeights, isLoading: loadingWeights } = useGetScoreWeights();
 
   const updateEmployee = useUpdateEmployee();
   const approveKra = useApproveKraClosure();
   const approveTask = useApproveTaskStatus();
+  const createHolidayMut = useCreateHoliday();
+  const deleteHolidayMut = useDeleteHoliday();
+  const updateWeightsMut = useUpdateScoreWeights();
 
   // Department mutations
   const createDept = useCreateDepartment();
@@ -213,6 +226,29 @@ export default function Admin() {
 
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ id: number; name: string; newRole: RoleType } | null>(null);
   const [filterDept, setFilterDept] = useState("all");
+
+  // Holiday state
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+
+  // Score weights form state (init from server data when loaded)
+  const [wKra, setWKra] = useState<number>(40);
+  const [wTask, setWTask] = useState<number>(30);
+  const [wProd, setWProd] = useState<number>(15);
+  const [wPunct, setWPunct] = useState<number>(10);
+  const [wDisc, setWDisc] = useState<number>(5);
+  const weightsTotal = wKra + wTask + wProd + wPunct + wDisc;
+
+  // Sync weights form from server when data loads
+  useEffect(() => {
+    if (scoreWeights) {
+      setWKra(scoreWeights.kraWeight);
+      setWTask(scoreWeights.taskCompletionWeight);
+      setWProd(scoreWeights.productivityWeight);
+      setWPunct(scoreWeights.punctualityWeight);
+      setWDisc(scoreWeights.disciplineWeight);
+    }
+  }, [scoreWeights]);
 
   // Dept dialog state
   const [deptDialog, setDeptDialog] = useState(false);
@@ -363,21 +399,27 @@ export default function Admin() {
 
       {/* Tabs */}
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" /> Users
+        <TabsList className="flex h-auto flex-wrap gap-1 bg-muted p-1 rounded-lg">
+          <TabsTrigger value="users" className="flex items-center gap-1.5 text-xs">
+            <Users className="h-3.5 w-3.5" /> Users
           </TabsTrigger>
-          <TabsTrigger value="masters" className="flex items-center gap-2">
-            <LayoutList className="h-4 w-4" /> Masters
+          <TabsTrigger value="masters" className="flex items-center gap-1.5 text-xs">
+            <LayoutList className="h-3.5 w-3.5" /> Masters
           </TabsTrigger>
-          <TabsTrigger value="approvals" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" /> Approvals
+          <TabsTrigger value="approvals" className="flex items-center gap-1.5 text-xs">
+            <Bell className="h-3.5 w-3.5" /> Approvals
             {totalPending > 0 && (
-              <Badge className="h-5 min-w-5 px-1.5 bg-orange-500 text-white text-xs">{totalPending}</Badge>
+              <Badge className="h-4 min-w-4 px-1 bg-orange-500 text-white text-[10px]">{totalPending}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" /> Activity Log
+          <TabsTrigger value="logs" className="flex items-center gap-1.5 text-xs">
+            <Activity className="h-3.5 w-3.5" /> Activity Log
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-1.5 text-xs">
+            <Settings className="h-3.5 w-3.5" /> KPI Weights
+          </TabsTrigger>
+          <TabsTrigger value="holidays" className="flex items-center gap-1.5 text-xs">
+            <CalendarDays className="h-3.5 w-3.5" /> Holidays
           </TabsTrigger>
         </TabsList>
 
@@ -565,7 +607,7 @@ export default function Admin() {
                       </h4>
                       <div className="space-y-2">
                         {pendingData!.kras.map((kra) => (
-                          <div key={kra.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                          <div key={kra.id} className={`flex items-center justify-between p-3 rounded-lg border bg-card ${kra.isOverdue ? "border-red-200 dark:border-red-900/50" : ""}`}>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{kra.title}</p>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -575,6 +617,12 @@ export default function Admin() {
                                 </span>
                                 {kra.achievementPct != null && (
                                   <span className="text-xs text-muted-foreground">Achievement: {kra.achievementPct}%</span>
+                                )}
+                                {kra.workingHoursElapsed > 0 && (
+                                  <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${kra.isOverdue ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"}`}>
+                                    {kra.isOverdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    {kra.workingHoursElapsed.toFixed(1)}h{kra.isOverdue ? " — OVERDUE" : " elapsed"}
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -598,14 +646,20 @@ export default function Admin() {
                       </h4>
                       <div className="space-y-2">
                         {pendingData!.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                          <div key={task.id} className={`flex items-center justify-between p-3 rounded-lg border bg-card ${task.isOverdue ? "border-red-200 dark:border-red-900/50" : ""}`}>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{task.title}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 <p className="text-xs text-muted-foreground">{task.assignedToName} · {task.departmentName}</p>
                                 <span className="text-xs font-medium">{task.status}</span>
                                 <span className="text-xs text-muted-foreground">→</span>
                                 <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">{task.requestedStatus}</span>
+                                {task.workingHoursElapsed > 0 && (
+                                  <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${task.isOverdue ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"}`}>
+                                    {task.isOverdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    {task.workingHoursElapsed.toFixed(1)}h{task.isOverdue ? " — OVERDUE" : " elapsed"}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="flex gap-2 ml-4 shrink-0">
@@ -653,6 +707,186 @@ export default function Admin() {
                     <p className="text-xs text-muted-foreground whitespace-nowrap ml-4">{format(new Date(a.createdAt), "MMM d, h:mm a")}</p>
                   </div>
                 )) : <p className="text-sm text-muted-foreground py-4 text-center">No activity recorded yet.</p>}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── KPI Weights Tab ── */}
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-blue-500" /> KPI Score Component Weights
+              </CardTitle>
+              <CardDescription>
+                Configure how each component contributes to the total KPI score. Weights must sum to exactly 100%.
+                Working hours for SLA enforcement: Mon–Fri, 10 AM – 6 PM (4-hour approval SLA).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingWeights ? (
+                <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+              ) : (
+                <div className="space-y-5 max-w-lg">
+                  {[
+                    { label: "KRA Achievement", value: wKra, setter: setWKra, hint: "Based on avg. achievement % of assigned KRAs" },
+                    { label: "Task Completion", value: wTask, setter: setWTask, hint: "% of tasks completed or approved" },
+                    { label: "Productivity", value: wProd, setter: setWProd, hint: "Manually assessed by manager" },
+                    { label: "Punctuality", value: wPunct, setter: setWPunct, hint: "Manually assessed by manager" },
+                    { label: "Discipline", value: wDisc, setter: setWDisc, hint: "Manually assessed by manager" },
+                  ].map(({ label, value, setter, hint }) => (
+                    <div key={label} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">{label}</label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number" min={0} max={100} step={1}
+                            value={value}
+                            onChange={(e) => setter(Math.max(0, Math.min(100, Number(e.target.value))))}
+                            className="w-20 h-8 text-center text-sm"
+                          />
+                          <span className="text-sm text-muted-foreground w-4">%</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{hint}</p>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(value, 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg border-2 font-medium ${Math.abs(weightsTotal - 100) < 0.5 ? "border-green-300 bg-green-50 dark:bg-green-950/20" : "border-red-300 bg-red-50 dark:bg-red-950/20"}`}>
+                    <span className="text-sm">Total</span>
+                    <span className={`text-lg font-bold ${Math.abs(weightsTotal - 100) < 0.5 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>
+                      {weightsTotal}%
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      onClick={() => {
+                        if (scoreWeights) {
+                          setWKra(scoreWeights.kraWeight);
+                          setWTask(scoreWeights.taskCompletionWeight);
+                          setWProd(scoreWeights.productivityWeight);
+                          setWPunct(scoreWeights.punctualityWeight);
+                          setWDisc(scoreWeights.disciplineWeight);
+                        }
+                      }}
+                      variant="outline" size="sm"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={Math.abs(weightsTotal - 100) >= 0.5 || updateWeightsMut.isPending}
+                      onClick={() => {
+                        updateWeightsMut.mutate({
+                          data: {
+                            kraWeight: wKra,
+                            taskCompletionWeight: wTask,
+                            productivityWeight: wProd,
+                            punctualityWeight: wPunct,
+                            disciplineWeight: wDisc,
+                          },
+                        }, {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: getGetScoreWeightsQueryKey() });
+                            toast({ title: "KPI weights saved successfully" });
+                          },
+                          onError: (e: unknown) => toast({ title: (e as { message?: string })?.message ?? "Failed to save weights", variant: "destructive" }),
+                        });
+                      }}
+                    >
+                      Save Weights
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Holidays Tab ── */}
+        <TabsContent value="holidays">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-emerald-500" /> Holiday Calendar
+                <Badge variant="secondary" className="ml-auto">{holidays?.length ?? 0} holidays</Badge>
+              </CardTitle>
+              <CardDescription>
+                Public and company holidays excluded from the 4-hour approval SLA working-hours calculation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add holiday form */}
+              <div className="flex gap-2 items-end">
+                <div className="space-y-1 flex-1">
+                  <label className="text-xs font-medium text-muted-foreground">Date</label>
+                  <Input
+                    type="date"
+                    value={holidayDate}
+                    onChange={(e) => setHolidayDate(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 flex-[2]">
+                  <label className="text-xs font-medium text-muted-foreground">Holiday Name</label>
+                  <Input
+                    placeholder="e.g. Diwali, Republic Day…"
+                    value={holidayName}
+                    onChange={(e) => setHolidayName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && holidayDate && holidayName.trim() && createHolidayMut.mutate({ data: { date: holidayDate, name: holidayName.trim() } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListHolidaysQueryKey() }); setHolidayDate(""); setHolidayName(""); toast({ title: "Holiday added" }); } })}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <Button
+                  size="sm" className="h-8"
+                  disabled={!holidayDate || !holidayName.trim() || createHolidayMut.isPending}
+                  onClick={() => createHolidayMut.mutate({ data: { date: holidayDate, name: holidayName.trim() } }, {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries({ queryKey: getListHolidaysQueryKey() });
+                      setHolidayDate(""); setHolidayName("");
+                      toast({ title: "Holiday added" });
+                    },
+                    onError: () => toast({ title: "Failed to add holiday", variant: "destructive" }),
+                  })}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
+              </div>
+
+              {/* Holiday list */}
+              <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
+                {loadingHolidays ? (
+                  Array.from({ length: 5 }).map((_, i) => <div key={i} className="px-3 py-2"><Skeleton className="h-4 w-full" /></div>)
+                ) : holidays?.length ? (
+                  [...holidays].sort((a, b) => a.date.localeCompare(b.date)).map((h) => (
+                    <div key={h.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">
+                          {new Date(h.date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                        <span className="text-sm font-medium">{h.name}</span>
+                        {new Date(h.date + "T00:00:00").getDay() === 0 || new Date(h.date + "T00:00:00").getDay() === 6 ? (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1">Weekend</Badge>
+                        ) : null}
+                      </div>
+                      <Button
+                        variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={() => deleteHolidayMut.mutate({ id: h.id }, {
+                          onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListHolidaysQueryKey() }); toast({ title: "Holiday removed" }); },
+                        })}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-6">No holidays configured yet.</p>
+                )}
               </div>
             </CardContent>
           </Card>

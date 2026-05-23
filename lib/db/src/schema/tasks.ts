@@ -8,6 +8,7 @@ export const tasksTable = pgTable("tasks", {
   description: text("description"),
   status: text("status").notNull().default("pending"), // pending | in_progress | completed | delayed | approved | rejected
   requestedStatus: text("requested_status"), // employee's pending status change request
+  statusRequestedAt: timestamp("status_requested_at", { withTimezone: true }),
   priority: text("priority").notNull().default("medium"), // high | medium | low
   dueDate: text("due_date"),
   completedAt: timestamp("completed_at", { withTimezone: true }),

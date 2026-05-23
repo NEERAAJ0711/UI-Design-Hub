@@ -613,6 +613,10 @@ export interface PendingKraApproval {
   kraStatus: string;
   /** @nullable */
   submittedAt?: string | null;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }
 
 export interface PendingTaskApproval {
@@ -624,6 +628,10 @@ export interface PendingTaskApproval {
   status: string;
   requestedStatus: string;
   progressPct?: number;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }
 
 export interface HrPendingKraApproval {
@@ -635,12 +643,51 @@ export interface HrPendingKraApproval {
   departmentName: string;
   reviewPeriod?: string;
   createdAt: string;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }
 
 export interface PendingApprovals {
   kras: PendingKraApproval[];
   tasks: PendingTaskApproval[];
   krasPendingHrApproval: HrPendingKraApproval[];
+}
+
+export interface Holiday {
+  id: number;
+  date: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface HolidayInput {
+  date: string;
+  name: string;
+}
+
+export interface ScoreWeights {
+  id: number;
+  kraWeight: number;
+  taskCompletionWeight: number;
+  productivityWeight: number;
+  punctualityWeight: number;
+  disciplineWeight: number;
+}
+
+export interface ScoreWeightsInput {
+  kraWeight: number;
+  taskCompletionWeight: number;
+  productivityWeight: number;
+  punctualityWeight: number;
+  disciplineWeight: number;
+}
+
+export interface KpiCalculateInput {
+  employeeId: number;
+  month: number;
+  year: number;
 }
 
 export type Logout200 = {

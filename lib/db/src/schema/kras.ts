@@ -16,6 +16,7 @@ export const krasTable = pgTable("kras", {
   kraStatus: text("kra_status").notNull().default("active"), // active | submitted | manager_approved | approved | rejected
   hrApprovalStatus: text("hr_approval_status").notNull().default("pending_hr"), // pending_hr | hr_approved | hr_rejected
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  managerApprovedAt: timestamp("manager_approved_at", { withTimezone: true }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

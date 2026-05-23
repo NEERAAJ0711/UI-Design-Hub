@@ -15,4 +15,8 @@ export interface HrPendingKraApproval {
   departmentName: string;
   reviewPeriod?: string;
   createdAt: string;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }

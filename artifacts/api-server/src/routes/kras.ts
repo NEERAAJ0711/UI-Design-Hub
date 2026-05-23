@@ -176,6 +176,7 @@ router.patch("/kras/:id/approve-close", async (req, res) => {
     newStatus = "rejected";
   } else if (existing.kraStatus === "submitted") {
     newStatus = "manager_approved";
+    extra.managerApprovedAt = new Date();
   } else {
     newStatus = "approved";
     extra.closedAt = new Date();

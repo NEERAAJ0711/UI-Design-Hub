@@ -15,4 +15,8 @@ export interface PendingTaskApproval {
   status: string;
   requestedStatus: string;
   progressPct?: number;
+  /** @nullable */
+  pendingAt?: string | null;
+  workingHoursElapsed: number;
+  isOverdue: boolean;
 }

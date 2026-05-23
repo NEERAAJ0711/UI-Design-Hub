@@ -1135,7 +1135,10 @@ export const GetPendingApprovalsResponse = zod.object({
   "departmentName": zod.string(),
   "achievementPct": zod.number().nullish(),
   "kraStatus": zod.string(),
-  "submittedAt": zod.string().nullish()
+  "submittedAt": zod.string().nullish(),
+  "pendingAt": zod.string().nullish(),
+  "workingHoursElapsed": zod.number(),
+  "isOverdue": zod.boolean()
 })),
   "tasks": zod.array(zod.object({
   "id": zod.number(),
@@ -1145,7 +1148,10 @@ export const GetPendingApprovalsResponse = zod.object({
   "departmentName": zod.string(),
   "status": zod.string(),
   "requestedStatus": zod.string(),
-  "progressPct": zod.number().optional()
+  "progressPct": zod.number().optional(),
+  "pendingAt": zod.string().nullish(),
+  "workingHoursElapsed": zod.number(),
+  "isOverdue": zod.boolean()
 })),
   "krasPendingHrApproval": zod.array(zod.object({
   "id": zod.number(),
@@ -1154,8 +1160,84 @@ export const GetPendingApprovalsResponse = zod.object({
   "weightage": zod.number().optional(),
   "departmentName": zod.string(),
   "reviewPeriod": zod.string().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "pendingAt": zod.string().nullish(),
+  "workingHoursElapsed": zod.number(),
+  "isOverdue": zod.boolean()
 }))
+})
+
+
+/**
+ * @summary List all holidays
+ */
+export const ListHolidaysResponseItem = zod.object({
+  "id": zod.number(),
+  "date": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListHolidaysResponse = zod.array(ListHolidaysResponseItem)
+
+
+/**
+ * @summary Create a holiday
+ */
+export const CreateHolidayBody = zod.object({
+  "date": zod.string(),
+  "name": zod.string()
+})
+
+
+/**
+ * @summary Delete a holiday
+ */
+export const DeleteHolidayParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Get KPI score component weights
+ */
+export const GetScoreWeightsResponse = zod.object({
+  "id": zod.number(),
+  "kraWeight": zod.number(),
+  "taskCompletionWeight": zod.number(),
+  "productivityWeight": zod.number(),
+  "punctualityWeight": zod.number(),
+  "disciplineWeight": zod.number()
+})
+
+
+/**
+ * @summary Update KPI score component weights (must sum to 100)
+ */
+export const UpdateScoreWeightsBody = zod.object({
+  "kraWeight": zod.number(),
+  "taskCompletionWeight": zod.number(),
+  "productivityWeight": zod.number(),
+  "punctualityWeight": zod.number(),
+  "disciplineWeight": zod.number()
+})
+
+export const UpdateScoreWeightsResponse = zod.object({
+  "id": zod.number(),
+  "kraWeight": zod.number(),
+  "taskCompletionWeight": zod.number(),
+  "productivityWeight": zod.number(),
+  "punctualityWeight": zod.number(),
+  "disciplineWeight": zod.number()
+})
+
+
+/**
+ * @summary Auto-calculate KPI from KRA achievement and task completion
+ */
+export const CalculateKpiBody = zod.object({
+  "employeeId": zod.number(),
+  "month": zod.number(),
+  "year": zod.number()
 })
 
 

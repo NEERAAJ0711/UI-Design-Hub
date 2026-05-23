@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, kpisTable, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
+import { db, kpisTable, krasTable, tasksTable, scoreWeightsTable, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import {
   CreateKpiBody,
@@ -123,6 +123,64 @@ router.delete("/kpis/:id", async (req, res) => {
   const { id } = DeleteKpiParams.parse({ id: Number(req.params.id) });
   await db.delete(kpisTable).where(eq(kpisTable.id, id));
   res.status(204).send();
+});
+
+router.post("/kpis/calculate", async (req, res) => {
+  const { employeeId, month, year } = req.body as { employeeId: number; month: number; year: number };
+  if (!employeeId || !month || !year) {
+    res.status(400).json({ error: "employeeId, month, and year are required" }); return;
+  }
+
+  const [weights] = await db.select().from(scoreWeightsTable);
+  const w = weights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+
+  const kras = await db.select().from(krasTable)
+    .where(and(eq(krasTable.employeeId, employeeId), eq(krasTable.hrApprovalStatus, "hr_approved")));
+  const kraAchievement = kras.length
+    ? Math.round((kras.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / kras.length) * 10) / 10
+    : 0;
+
+  const tasks = await db.select().from(tasksTable).where(eq(tasksTable.assignedToId, employeeId));
+  const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
+  const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
+
+  const [existing] = await db.select().from(kpisTable)
+    .where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year)));
+
+  const productivity = existing?.productivity ?? 0;
+  const punctuality = existing?.punctuality ?? 0;
+  const discipline = existing?.discipline ?? 0;
+
+  const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
+  const rawScore = (
+    kraAchievement * w.kraWeight +
+    taskCompletion * w.taskCompletionWeight +
+    productivity * w.productivityWeight +
+    punctuality * w.punctualityWeight +
+    discipline * w.disciplineWeight
+  ) / (totalWeight || 100);
+  const totalScore = Math.round(rawScore * 10) / 10;
+
+  let kpi;
+  if (existing) {
+    [kpi] = await db.update(kpisTable)
+      .set({ kraAchievement, taskCompletion, totalScore })
+      .where(eq(kpisTable.id, existing.id))
+      .returning();
+  } else {
+    [kpi] = await db.insert(kpisTable)
+      .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+      .returning();
+  }
+
+  await db.insert(activityLogTable).values({
+    type: "kpi_updated",
+    description: `KPI auto-calculated for employee ${employeeId}: KRA=${kraAchievement}%, Tasks=${taskCompletion}%, Total=${totalScore}%`,
+    entityId: kpi!.id,
+    entityType: "kpi",
+  });
+
+  res.status(201).json(await enrichKpi(kpi!));
 });
 
 export default router;

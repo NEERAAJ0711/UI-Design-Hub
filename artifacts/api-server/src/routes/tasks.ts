@@ -134,7 +134,7 @@ router.patch("/tasks/:id/request-status", async (req, res) => {
   const { id } = RequestTaskStatusParams.parse({ id: Number(req.params.id) });
   const { status, progressPct } = RequestTaskStatusBody.parse(req.body);
 
-  const updateData: Record<string, unknown> = { requestedStatus: status };
+  const updateData: Record<string, unknown> = { requestedStatus: status, statusRequestedAt: new Date() };
   if (progressPct !== undefined) updateData.progressPct = progressPct;
 
   const [task] = await db.update(tasksTable).set(updateData).where(eq(tasksTable.id, id)).returning();
