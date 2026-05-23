@@ -27,8 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle, Bell, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle, Bell } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -63,6 +62,36 @@ const hrStatusLabel: Record<string, string> = {
 };
 
 const FREQ_NEEDS_DATE = ["monthly", "quarterly", "yearly"] as const;
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function ordinalSuffix(n: number) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return "th";
+  return (["th","st","nd","rd"] as const)[n % 10] ?? "th";
+}
+
+function formatDueDateCell(dueDate: string | null | undefined, frequency: string | null | undefined) {
+  if (!dueDate || !frequency) return <span className="text-muted-foreground text-sm">—</span>;
+  if (frequency === "monthly") {
+    const day = parseInt(dueDate, 10);
+    return <span className="text-sm">{isNaN(day) ? dueDate : `${day}${ordinalSuffix(day)} of every month`}</span>;
+  }
+  if (frequency === "yearly") {
+    const [dd, mm] = dueDate.split("/");
+    const monthName = mm ? (MONTHS_SHORT[parseInt(mm, 10) - 1] ?? mm) : "";
+    return <span className="text-sm">{dd} {monthName} every year</span>;
+  }
+  if (frequency === "quarterly") {
+    const parts = dueDate.split(",").map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
+    return (
+      <div className="text-xs space-y-0.5">
+        {parts.map((p, i) => <div key={i}><span className="font-medium">Q{i + 1}:</span> {p}</div>)}
+      </div>
+    );
+  }
+  return <span className="text-muted-foreground text-sm">—</span>;
+}
 
 const kraSchema = z.object({
   title: z.string().min(1, "Title required"),
@@ -154,14 +183,7 @@ function EmployeeKras() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
-                    <TableCell>
-                      {kra.dueDate ? (
-                        <div className={`flex items-center gap-1 text-sm ${kra.dueDate < new Date().toISOString().split("T")[0] && kra.kraStatus !== "approved" ? "text-red-600 font-medium" : ""}`}>
-                          <Calendar className="h-3.5 w-3.5 shrink-0" />
-                          {format(new Date(kra.dueDate), "MMM d, yyyy")}
-                        </div>
-                      ) : <span className="text-muted-foreground text-sm">—</span>}
-                    </TableCell>
+                    <TableCell>{formatDueDateCell(kra.dueDate, kra.frequency)}</TableCell>
                     <TableCell>{kra.weightage}%</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -253,6 +275,7 @@ function FullKras() {
   const [deleteTarget, setDeleteTarget] = useState<KraRow | null>(null);
   const [scoreTarget, setScoreTarget] = useState<KraRow | null>(null);
   const [filterDept, setFilterDept] = useState("all");
+  const [qDates, setQDates] = useState(["", "", "", ""]);
 
   const form = useForm<KraForm>({
     resolver: zodResolver(kraSchema),
@@ -267,10 +290,10 @@ function FullKras() {
   const krasPendingHrApproval = pendingData?.krasPendingHrApproval ?? [];
 
   const watchedFrequency = form.watch("frequency");
-  const showDueDate = (FREQ_NEEDS_DATE as readonly string[]).includes(watchedFrequency);
 
   function openCreate() {
     setEditTarget(null);
+    setQDates(["", "", "", ""]);
     form.reset({
       title: "", description: "", weightage: 20, frequency: "monthly", dueDate: "",
       departmentId: user?.role === "hod" ? (user.departmentId ?? undefined) : undefined,
@@ -280,21 +303,37 @@ function FullKras() {
 
   function openEdit(kra: KraRow) {
     setEditTarget(kra);
+    const freq = kra.frequency ?? "monthly";
+    if (freq === "quarterly" && kra.dueDate) {
+      const parts = kra.dueDate.split(",").map(s => s.trim());
+      setQDates([parts[0] ?? "", parts[1] ?? "", parts[2] ?? "", parts[3] ?? ""]);
+    } else {
+      setQDates(["", "", "", ""]);
+    }
     form.reset({
       title: kra.title,
       description: kra.description ?? "",
       weightage: kra.weightage,
       departmentId: kra.departmentId,
       employeeId: kra.employeeId ?? undefined,
-      frequency: (kra.frequency ?? "monthly") as typeof FREQUENCIES[number],
-      dueDate: kra.dueDate ?? "",
+      frequency: freq as typeof FREQUENCIES[number],
+      dueDate: freq !== "quarterly" ? (kra.dueDate ?? "") : "",
     });
     setDialogOpen(true);
   }
 
   function onSubmit(values: KraForm) {
     const needsDate = (FREQ_NEEDS_DATE as readonly string[]).includes(values.frequency);
-    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined, dueDate: needsDate ? (values.dueDate || undefined) : undefined };
+    let dueDateVal: string | undefined;
+    if (needsDate) {
+      if (values.frequency === "quarterly") {
+        const filled = qDates.map(d => d.trim()).filter(Boolean);
+        dueDateVal = filled.length > 0 ? filled.join(",") : undefined;
+      } else {
+        dueDateVal = values.dueDate || undefined;
+      }
+    }
+    const payload = { ...values, description: values.description || undefined, employeeId: values.employeeId || undefined, dueDate: dueDateVal };
     if (editTarget) {
       updateKra.mutate({ id: editTarget.id, data: payload }, {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "KRA updated" }); },
@@ -483,14 +522,7 @@ function FullKras() {
                       }
                     </TableCell>
                     <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
-                    <TableCell>
-                      {kra.dueDate ? (
-                        <div className={`flex items-center gap-1 text-sm ${kra.dueDate < new Date().toISOString().split("T")[0] && kra.kraStatus !== "approved" ? "text-red-600 font-medium" : ""}`}>
-                          <Calendar className="h-3.5 w-3.5 shrink-0" />
-                          {format(new Date(kra.dueDate), "MMM d, yyyy")}
-                        </div>
-                      ) : <span className="text-muted-foreground text-sm">—</span>}
-                    </TableCell>
+                    <TableCell>{formatDueDateCell(kra.dueDate, kra.frequency)}</TableCell>
                     <TableCell>{kra.weightage}%</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -561,20 +593,49 @@ function FullKras() {
                 )} />
                 <FormField control={form.control} name="frequency" render={({ field }) => (
                   <FormItem><FormLabel>Monitoring Frequency</FormLabel>
-                    <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (!(FREQ_NEEDS_DATE as readonly string[]).includes(v)) form.setValue("dueDate", ""); }}>
+                    <Select value={field.value} onValueChange={(v) => { field.onChange(v); form.setValue("dueDate", ""); setQDates(["", "", "", ""]); }}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>{FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}</SelectContent>
                     </Select><FormMessage />
                   </FormItem>
                 )} />
-                {showDueDate && (
+                {watchedFrequency === "monthly" && (
                   <FormField control={form.control} name="dueDate" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Due Date <span className="text-xs text-muted-foreground">(fixed anchor date for this cycle)</span></FormLabel>
-                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormLabel>Day of Month</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" min={1} max={31} placeholder="e.g. 15" {...field} className="w-24" />
+                          <span className="text-sm text-muted-foreground">of every month</span>
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
+                )}
+                {watchedFrequency === "yearly" && (
+                  <FormField control={form.control} name="dueDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Annual Date <span className="text-xs text-muted-foreground">(DD/MM)</span></FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 31/03" maxLength={5} {...field} className="w-32" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+                {watchedFrequency === "quarterly" && (
+                  <div className="col-span-2 space-y-2">
+                    <p className="text-sm font-medium leading-none">Quarterly Dates <span className="text-xs font-normal text-muted-foreground">(DD/MM for each quarter)</span></p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["Q1", "Q2", "Q3", "Q4"] as const).map((q, i) => (
+                        <div key={q} className="flex items-center gap-2">
+                          <span className="text-sm font-medium w-7 shrink-0">{q}</span>
+                          <Input placeholder="DD/MM" maxLength={5} value={qDates[i]} onChange={(e) => setQDates(prev => prev.map((v, idx) => idx === i ? e.target.value : v))} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 <FormField control={form.control} name="departmentId" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel>
