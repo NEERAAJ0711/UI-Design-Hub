@@ -82,22 +82,22 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={`border-r border-border bg-sidebar text-sidebar-foreground ${isAdmin ? "border-r-red-200 dark:border-r-red-900/30" : ""}`}>
-      <SidebarHeader className="px-3 py-3 border-b border-sidebar-border">
-        <div className="flex items-center gap-2.5">
-          <div className="flex-shrink-0 bg-white dark:bg-slate-800 rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700">
+      <SidebarHeader className="px-3 py-2.5 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
+          <div className="flex-shrink-0 bg-white rounded-md overflow-hidden shadow-sm">
             <img
               src="/logo.png"
               alt="RPS Group"
-              className="h-8 w-auto object-contain"
+              className="h-9 w-auto object-contain"
             />
           </div>
           <div className="min-w-0 flex-1">
-            <p className={`text-xs font-bold leading-tight truncate ${isAdmin ? "text-red-500" : "text-primary"}`}>
+            <p className={`text-[11px] font-bold leading-tight truncate ${isAdmin ? "text-red-500" : "text-primary"}`}>
               RPS INFRASTRUCTURE
             </p>
-            <p className="text-[10px] text-sidebar-foreground/60 truncate leading-tight">LIMITED</p>
+            <p className="text-[9px] text-sidebar-foreground/55 truncate leading-tight font-medium">LIMITED</p>
           </div>
-          {isAdmin && <ShieldAlert className="ml-auto h-4 w-4 text-red-400 shrink-0" />}
+          {isAdmin && <ShieldAlert className="ml-auto h-3.5 w-3.5 text-red-400 shrink-0" />}
         </div>
       </SidebarHeader>
       <SidebarContent>

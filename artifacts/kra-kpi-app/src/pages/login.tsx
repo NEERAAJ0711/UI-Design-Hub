@@ -43,16 +43,14 @@ export default function Login() {
         {/* Brand / Logo */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md px-6 py-4 inline-flex items-center justify-center border border-slate-200 dark:border-slate-700">
-              <img
-                src="/logo.png"
-                alt="RPS Group"
-                className="h-16 w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/logo.png"
+              alt="RPS Group — Building Futuristic Infrastructure"
+              className="h-24 w-auto object-contain drop-shadow-sm rounded-xl"
+            />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+            <h1 className="text-lg font-bold tracking-tight text-slate-800 dark:text-slate-100">
               RPS INFRASTRUCTURE LIMITED
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
