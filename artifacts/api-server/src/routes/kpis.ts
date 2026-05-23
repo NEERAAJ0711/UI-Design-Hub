@@ -125,6 +125,63 @@ router.delete("/kpis/:id", async (req, res) => {
   res.status(204).send();
 });
 
+router.post("/kpis/calculate-batch", async (req, res) => {
+  const { month, year } = req.body as { month: number; year: number };
+  if (!month || !year) {
+    res.status(400).json({ error: "month and year are required" }); return;
+  }
+
+  const allEmployees = await db.select({ id: employeesTable.id }).from(employeesTable);
+  const [weights] = await db.select().from(scoreWeightsTable);
+  const w = weights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+
+  const allKras = await db.select().from(krasTable).where(eq(krasTable.hrApprovalStatus, "hr_approved"));
+  const allTasks = await db.select().from(tasksTable);
+  const allExisting = await db.select().from(kpisTable)
+    .where(and(eq(kpisTable.month, month), eq(kpisTable.year, year)));
+
+  const existingMap = new Map(allExisting.map((k) => [k.employeeId, k]));
+
+  let saved = 0;
+  for (const emp of allEmployees) {
+    const kras = allKras.filter((k) => k.employeeId === emp.id);
+    const kraAchievement = kras.length
+      ? Math.round((kras.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / kras.length) * 10) / 10
+      : 0;
+
+    const tasks = allTasks.filter((t) => t.assignedToId === emp.id);
+    const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
+    const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
+
+    const existing = existingMap.get(emp.id);
+    const productivity = existing?.productivity ?? 0;
+    const punctuality = existing?.punctuality ?? 0;
+    const discipline = existing?.discipline ?? 0;
+
+    const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
+    const rawScore = (
+      kraAchievement * w.kraWeight +
+      taskCompletion * w.taskCompletionWeight +
+      productivity * w.productivityWeight +
+      punctuality * w.punctualityWeight +
+      discipline * w.disciplineWeight
+    ) / (totalWeight || 100);
+    const totalScore = Math.round(rawScore * 10) / 10;
+
+    if (existing) {
+      await db.update(kpisTable)
+        .set({ kraAchievement, taskCompletion, totalScore })
+        .where(eq(kpisTable.id, existing.id));
+    } else {
+      await db.insert(kpisTable)
+        .values({ employeeId: emp.id, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore });
+    }
+    saved++;
+  }
+
+  res.status(201).json({ saved });
+});
+
 router.post("/kpis/calculate", async (req, res) => {
   const { employeeId, month, year } = req.body as { employeeId: number; month: number; year: number };
   if (!employeeId || !month || !year) {

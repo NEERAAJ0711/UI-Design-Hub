@@ -5,7 +5,7 @@ import {
   useListDepartments,
   useCreateKpi,
   useDeleteKpi,
-  useCalculateKpi,
+  useCalculateKpiBatch,
   useGetScoreWeights,
   getListKpisQueryKey,
 } from "@workspace/api-client-react";
@@ -51,8 +51,7 @@ export default function KPIs() {
   const { data: departments } = useListDepartments();
   const { data: scoreWeights } = useGetScoreWeights();
   const deleteKpi = useDeleteKpi();
-  const { mutateAsync: calculateKpiAsync } = useCalculateKpi();
-  const { mutateAsync: createKpiAsync } = useCreateKpi();
+  const { mutateAsync: calculateKpiBatchAsync } = useCalculateKpiBatch();
 
   const [deleteTarget, setDeleteTarget] = useState<KpiRow | null>(null);
   const [filterEmp, setFilterEmp] = useState("all");
@@ -62,29 +61,21 @@ export default function KPIs() {
   const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
 
   // Auto-calculate & save KPI scores for all employees on page load (once per session)
+  // Uses a single batch endpoint instead of 250 parallel requests for fast page load.
   useEffect(() => {
-    if (isEmployee || !employees || employees.length === 0 || hasAutoCalced.current) return;
+    if (isEmployee || hasAutoCalced.current) return;
     hasAutoCalced.current = true;
     const month = new Date().getMonth() + 1;
     const year = new Date().getFullYear();
-    const existingKeys = new Set((kpis ?? []).map((k) => `${k.employeeId}-${k.month}-${k.year}`));
-    const toCalc = employees.filter((e) => !existingKeys.has(`${e.id}-${month}-${year}`));
-    if (toCalc.length === 0) return;
-    (async () => {
-      let saved = 0;
-      await Promise.all(toCalc.map(async (emp) => {
-        try {
-          const result = await calculateKpiAsync({ data: { employeeId: emp.id, month, year } });
-          await createKpiAsync({ data: { employeeId: emp.id, month, year, kraAchievement: result.kraAchievement, taskCompletion: result.taskCompletion, productivity: 0, punctuality: 0, discipline: 0 } });
-          saved++;
-        } catch { /* skip individual failures */ }
-      }));
-      if (saved > 0) {
-        queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
-        toast({ title: `KPI scores auto-calculated for ${saved} employee(s)` });
-      }
-    })();
-  }, [employees, kpis]);
+    calculateKpiBatchAsync({ data: { month, year } })
+      .then(({ saved }) => {
+        if (saved > 0) {
+          queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
+          toast({ title: `KPI scores auto-calculated for ${saved} employee(s)` });
+        }
+      })
+      .catch(() => { /* silent — batch failures are non-critical */ });
+  }, [isEmployee]);
 
   function confirmDelete() {
     if (!deleteTarget) return;

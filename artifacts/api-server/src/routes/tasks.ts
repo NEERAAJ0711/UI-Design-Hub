@@ -67,11 +67,28 @@ router.get("/tasks", async (req, res) => {
 
 router.post("/tasks", async (req, res) => {
   const body = CreateTaskBody.parse(req.body);
-  const [task] = await db.insert(tasksTable).values(body).returning();
+
+  // Detect cross-department assignment: if assignee belongs to a different dept
+  // than the task's department, require the assignee's HOD to approve first.
+  const [assignee] = await db.select({ departmentId: employeesTable.departmentId })
+    .from(employeesTable).where(eq(employeesTable.id, body.assignedToId));
+
+  let finalStatus = "pending";
+  let finalDeptId = body.departmentId;
+  if (assignee && assignee.departmentId !== body.departmentId) {
+    finalStatus = "awaiting_hod_approval";
+    finalDeptId = assignee.departmentId; // move to assignee's dept so their HOD sees it
+  }
+
+  const [task] = await db.insert(tasksTable)
+    .values({ ...body, status: finalStatus, departmentId: finalDeptId })
+    .returning();
 
   await db.insert(activityLogTable).values({
     type: "task_created",
-    description: `Task "${task.title}" created`,
+    description: finalStatus === "awaiting_hod_approval"
+      ? `Cross-dept task "${task.title}" awaiting HOD approval`
+      : `Task "${task.title}" created`,
     actorId: task.createdById,
     entityId: task.id,
     entityType: "task",

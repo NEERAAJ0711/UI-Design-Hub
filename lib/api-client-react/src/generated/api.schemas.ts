@@ -353,6 +353,7 @@ export const TaskStatus = {
   delayed: 'delayed',
   approved: 'approved',
   rejected: 'rejected',
+  awaiting_hod_approval: 'awaiting_hod_approval',
 } as const;
 
 export type TaskPriority = typeof TaskPriority[keyof typeof TaskPriority];
@@ -478,6 +479,7 @@ export const TaskStatusInputStatus = {
   delayed: 'delayed',
   approved: 'approved',
   rejected: 'rejected',
+  awaiting_hod_approval: 'awaiting_hod_approval',
 } as const;
 
 export interface TaskStatusInput {
@@ -649,10 +651,23 @@ export interface HrPendingKraApproval {
   isOverdue: boolean;
 }
 
+export interface CrossDeptTaskApproval {
+  id: number;
+  title: string;
+  assignedToName: string;
+  createdByName: string;
+  departmentName: string;
+  priority: string;
+  /** @nullable */
+  dueDate?: string | null;
+  createdAt: string;
+}
+
 export interface PendingApprovals {
   kras: PendingKraApproval[];
   tasks: PendingTaskApproval[];
   krasPendingHrApproval: HrPendingKraApproval[];
+  crossDeptTasks: CrossDeptTaskApproval[];
 }
 
 export interface Holiday {
@@ -686,6 +701,11 @@ export interface ScoreWeightsInput {
 
 export interface KpiCalculateInput {
   employeeId: number;
+  month: number;
+  year: number;
+}
+
+export interface KpiCalculateBatchInput {
   month: number;
   year: number;
 }
@@ -735,5 +755,9 @@ export type GetPendingApprovalsParams = {
 departmentId?: number;
 approverId?: number;
 role?: string;
+};
+
+export type CalculateKpiBatch201 = {
+  saved: number;
 };
 

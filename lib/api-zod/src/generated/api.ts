@@ -735,7 +735,7 @@ export const ListTasksResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -784,7 +784,7 @@ export const GetTaskResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -824,7 +824,7 @@ export const UpdateTaskResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -858,14 +858,14 @@ export const UpdateTaskStatusParams = zod.object({
 })
 
 export const UpdateTaskStatusBody = zod.object({
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected'])
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval'])
 })
 
 export const UpdateTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -899,7 +899,7 @@ export const RequestTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -933,7 +933,7 @@ export const ApproveTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -1049,7 +1049,7 @@ export const GetOverdueTasksResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
@@ -1165,6 +1165,16 @@ export const GetPendingApprovalsResponse = zod.object({
   "pendingAt": zod.string().nullish(),
   "workingHoursElapsed": zod.number(),
   "isOverdue": zod.boolean()
+})),
+  "crossDeptTasks": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "assignedToName": zod.string(),
+  "createdByName": zod.string(),
+  "departmentName": zod.string(),
+  "priority": zod.string(),
+  "dueDate": zod.string().nullish(),
+  "createdAt": zod.string()
 }))
 })
 
@@ -1237,6 +1247,15 @@ export const UpdateScoreWeightsResponse = zod.object({
  */
 export const CalculateKpiBody = zod.object({
   "employeeId": zod.number(),
+  "month": zod.number(),
+  "year": zod.number()
+})
+
+
+/**
+ * @summary Auto-calculate KPI for all employees in one server-side batch
+ */
+export const CalculateKpiBatchBody = zod.object({
   "month": zod.number(),
   "year": zod.number()
 })

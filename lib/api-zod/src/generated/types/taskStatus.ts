@@ -16,4 +16,5 @@ export const TaskStatus = {
   delayed: 'delayed',
   approved: 'approved',
   rejected: 'rejected',
+  awaiting_hod_approval: 'awaiting_hod_approval',
 } as const;

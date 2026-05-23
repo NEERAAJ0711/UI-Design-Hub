@@ -1199,6 +1199,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Kpi"
 
+  /kpis/calculate-batch:
+    post:
+      operationId: calculateKpiBatch
+      tags: [kpis]
+      summary: Auto-calculate KPI for all employees in one server-side batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KpiCalculateBatchInput"
+      responses:
+        "201":
+          description: Saved count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [saved]
+                properties:
+                  saved: { type: integer }
+
 components:
   schemas:
     LoginInput:
@@ -1449,7 +1471,7 @@ components:
         id:               { type: integer }
         title:            { type: string }
         description:      { type: ["string", "null"] }
-        status:           { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected] }
+        status:           { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval] }
         requestedStatus:  { type: ["string", "null"] }
         priority:         { type: string, enum: [high, medium, low] }
         dueDate:          { type: ["string", "null"] }
@@ -1495,7 +1517,7 @@ components:
       type: object
       required: [status]
       properties:
-        status: { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected] }
+        status: { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval] }
 
     TaskComment:
       type: object
@@ -1658,9 +1680,22 @@ components:
         workingHoursElapsed: { type: number }
         isOverdue:           { type: boolean }
 
+    CrossDeptTaskApproval:
+      type: object
+      required: [id, title, assignedToName, createdByName, departmentName, priority, createdAt]
+      properties:
+        id:             { type: integer }
+        title:          { type: string }
+        assignedToName: { type: string }
+        createdByName:  { type: string }
+        departmentName: { type: string }
+        priority:       { type: string }
+        dueDate:        { type: ["string", "null"] }
+        createdAt:      { type: string }
+
     PendingApprovals:
       type: object
-      required: [kras, tasks, krasPendingHrApproval]
+      required: [kras, tasks, krasPendingHrApproval, crossDeptTasks]
       properties:
         kras:
           type: array
@@ -1674,6 +1709,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HrPendingKraApproval"
+        crossDeptTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrossDeptTaskApproval"
 
     Holiday:
       type: object
@@ -1719,3 +1758,10 @@ components:
         employeeId: { type: integer }
         month:      { type: integer }
         year:       { type: integer }
+
+    KpiCalculateBatchInput:
+      type: object
+      required: [month, year]
+      properties:
+        month: { type: integer }
+        year:  { type: integer }

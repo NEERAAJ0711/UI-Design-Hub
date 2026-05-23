@@ -111,9 +111,13 @@ function EmployeeTasks() {
   const isLoading = loadingAssigned || loadingCreated;
 
   // Merge assigned + created, deduplicate by id, tag each with viewer role
+  // Exclude tasks still awaiting another dept's HOD approval — employee sees them only after approval
   const tasks = (() => {
     const map = new Map<number, NonNullable<typeof assignedTasks>[number] & { myRole: "assignee" | "creator" | "both" }>();
-    for (const t of assignedTasks ?? []) map.set(t.id, { ...t, myRole: "assignee" });
+    for (const t of assignedTasks ?? []) {
+      if (t.status === "awaiting_hod_approval") continue;
+      map.set(t.id, { ...t, myRole: "assignee" });
+    }
     for (const t of createdTasks ?? []) {
       const existing = map.get(t.id);
       if (existing) existing.myRole = "both";
@@ -317,9 +321,21 @@ function FullTasks() {
   const { toast } = useToast();
 
   const deptFilter = user?.role === "hod" ? { departmentId: user.departmentId ?? undefined } : {};
+  const createdFilter = { createdById: user?.id };
   const approvalParams = { departmentId: user?.departmentId ?? undefined, role: user?.role };
 
-  const { data: tasks, isLoading } = useListTasks(deptFilter, { query: { queryKey: getListTasksQueryKey(deptFilter) } });
+  const { data: deptTasks, isLoading: loadingDept } = useListTasks(deptFilter, { query: { queryKey: getListTasksQueryKey(deptFilter) } });
+  const { data: createdByMeTasks, isLoading: loadingCreated } = useListTasks(createdFilter, { query: { queryKey: getListTasksQueryKey(createdFilter) } });
+  const isLoading = loadingDept || loadingCreated;
+
+  // HODs and managers see their dept tasks PLUS any tasks they personally created (cross-dept)
+  const tasks = (() => {
+    const map = new Map<number, NonNullable<typeof deptTasks>[number]>();
+    for (const t of deptTasks ?? []) map.set(t.id, t);
+    for (const t of createdByMeTasks ?? []) { if (!map.has(t.id)) map.set(t.id, t); }
+    return [...map.values()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  })();
+
   const { data: pendingData } = useGetPendingApprovals(approvalParams);
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
@@ -347,7 +363,13 @@ function FullTasks() {
   const deptEmployees = employees?.filter((e) => selectedDeptId ? e.departmentId === selectedDeptId : true);
 
   const pendingTaskApprovals = pendingData?.tasks ?? [];
+  const crossDeptPending = pendingData?.crossDeptTasks ?? [];
   const canManage = user?.role !== "employee";
+
+  function invalidateAllTaskQueries() {
+    queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) });
+    queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(createdFilter) });
+  }
 
   function openCreate() {
     setEditTarget(null);
@@ -379,11 +401,11 @@ function FullTasks() {
     const payload = { ...values, description: values.description || undefined, dueDate: values.dueDate || undefined, recurringFreq: values.isRecurring ? values.recurringFreq : undefined };
     if (editTarget) {
       updateTask.mutate({ id: editTarget.id, data: payload }, {
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "Task updated" }); },
+        onSuccess: () => { invalidateAllTaskQueries(); setDialogOpen(false); toast({ title: "Task updated" }); },
       });
     } else {
       createTask.mutate({ data: payload }, {
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDialogOpen(false); toast({ title: "Task created" }); },
+        onSuccess: () => { invalidateAllTaskQueries(); setDialogOpen(false); toast({ title: "Task created" }); },
       });
     }
   }
@@ -391,7 +413,8 @@ function FullTasks() {
   function changeStatus(taskId: number, status: string) {
     updateStatus.mutate({ id: taskId, data: { status: status as typeof STATUSES[number] } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) });
+        invalidateAllTaskQueries();
+        queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
         if (detailId === taskId) queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
         toast({ title: `Status updated to ${status.replace("_", " ")}` });
       },
@@ -401,21 +424,29 @@ function FullTasks() {
   function handleTaskApproval(id: number, approved: boolean) {
     approveStatus.mutate({ id, data: { approved } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) });
+        invalidateAllTaskQueries();
         queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
         toast({ title: approved ? "Status change approved" : "Status change rejected" });
       },
     });
   }
 
+  function approveCrossDeptTask(taskId: number) {
+    changeStatus(taskId, "pending");
+  }
+
+  function rejectCrossDeptTask(taskId: number) {
+    changeStatus(taskId, "rejected");
+  }
+
   function confirmDelete() {
     if (!deleteTarget) return;
     deleteTask.mutate({ id: deleteTarget.id }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(deptFilter) }); setDeleteTarget(null); toast({ title: "Task deleted" }); },
+      onSuccess: () => { invalidateAllTaskQueries(); setDeleteTarget(null); toast({ title: "Task deleted" }); },
     });
   }
 
-  const filtered = tasks?.filter((t) => {
+  const filtered = tasks.filter((t) => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     if (filterPriority !== "all" && t.priority !== filterPriority) return false;
     if (filterDept !== "all" && t.departmentId !== Number(filterDept)) return false;
@@ -434,7 +465,43 @@ function FullTasks() {
         )}
       </div>
 
-      {/* Pending Approvals */}
+      {/* Cross-Dept Tasks Awaiting HOD Approval */}
+      {crossDeptPending.length > 0 && (
+        <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4 text-purple-500" /> {crossDeptPending.length} Cross-Department Task{crossDeptPending.length > 1 ? "s" : ""} Awaiting Your Approval
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {crossDeptPending.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                  <div>
+                    <p className="text-sm font-medium">{t.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-muted-foreground">Assigned to: <strong>{t.assignedToName}</strong></span>
+                      <span className="text-xs text-muted-foreground">By: {t.createdByName}</span>
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${t.priority === "high" ? "bg-red-50 text-red-600" : t.priority === "medium" ? "bg-yellow-50 text-yellow-600" : "bg-slate-50 text-slate-600"}`}>{t.priority}</span>
+                      {t.dueDate && <span className="text-xs text-muted-foreground">Due: {t.dueDate}</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-3">
+                    <Button size="sm" variant="outline" className="text-green-600 border-green-200 h-7 px-2" onClick={() => approveCrossDeptTask(t.id)}>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600 border-red-200 h-7 px-2" onClick={() => rejectCrossDeptTask(t.id)}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Status Approvals */}
       {pendingTaskApprovals.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/10">
           <CardHeader className="pb-3">

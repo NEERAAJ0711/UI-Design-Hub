@@ -22,6 +22,7 @@ import type {
 import type {
   ActivityItem,
   ApproveCloseInput,
+  CalculateKpiBatch201,
   Company,
   CompanyInput,
   CurrentUser,
@@ -47,6 +48,7 @@ import type {
   HolidayInput,
   HrApproveKraInput,
   Kpi,
+  KpiCalculateBatchInput,
   KpiCalculateInput,
   KpiInput,
   KpiUpdate,
@@ -4554,5 +4556,76 @@ export const useCalculateKpi = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCalculateKpiMutationOptions(options));
+    }
+
+export const getCalculateKpiBatchUrl = () => {
+
+
+
+
+  return `/api/kpis/calculate-batch`
+}
+
+/**
+ * @summary Auto-calculate KPI for all employees in one server-side batch
+ */
+export const calculateKpiBatch = async (kpiCalculateBatchInput: KpiCalculateBatchInput, options?: RequestInit): Promise<CalculateKpiBatch201> => {
+
+  return customFetch<CalculateKpiBatch201>(getCalculateKpiBatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      kpiCalculateBatchInput,)
+  }
+);}
+
+
+
+
+export const getCalculateKpiBatchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateKpiBatch>>, TError,{data: BodyType<KpiCalculateBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof calculateKpiBatch>>, TError,{data: BodyType<KpiCalculateBatchInput>}, TContext> => {
+
+const mutationKey = ['calculateKpiBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calculateKpiBatch>>, {data: BodyType<KpiCalculateBatchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calculateKpiBatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalculateKpiBatchMutationResult = NonNullable<Awaited<ReturnType<typeof calculateKpiBatch>>>
+    export type CalculateKpiBatchMutationBody = BodyType<KpiCalculateBatchInput>
+    export type CalculateKpiBatchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Auto-calculate KPI for all employees in one server-side batch
+ */
+export const useCalculateKpiBatch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateKpiBatch>>, TError,{data: BodyType<KpiCalculateBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof calculateKpiBatch>>,
+        TError,
+        {data: BodyType<KpiCalculateBatchInput>},
+        TContext
+      > => {
+      return useMutation(getCalculateKpiBatchMutationOptions(options));
     }
 
