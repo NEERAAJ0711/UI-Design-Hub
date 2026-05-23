@@ -24,7 +24,17 @@ import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+const COLORS = ["#22c55e", "#ef4444", "#94a3b8", "#f59e0b", "#6366f1"];
+
+const TASK_STATUS_COLORS: Record<string, string> = {
+  completed:   "#22c55e",
+  rejected:    "#ef4444",
+  pending:     "#94a3b8",
+  delayed:     "#f59e0b",
+  in_progress: "#6366f1",
+  todo:        "#cbd5e1",
+  blocked:     "#f97316",
+};
 
 const ratingColors: Record<string, string> = {
   "Outstanding": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
@@ -108,7 +118,7 @@ function ManagementDashboard() {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={taskBreakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="count" nameKey="status">
-                    {taskBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {taskBreakdown.map((entry, i) => <Cell key={i} fill={TASK_STATUS_COLORS[entry.status] ?? COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
                   <Legend />
@@ -320,7 +330,7 @@ function ManagerHodDashboard() {
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie data={taskBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={5} dataKey="count" nameKey="status">
-                    {taskBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {taskBreakdown.map((entry, i) => <Cell key={i} fill={TASK_STATUS_COLORS[entry.status] ?? COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px" }} />
                   <Legend />
@@ -423,7 +433,7 @@ function EmployeeDashboard({ userId }: { userId: number }) {
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={summary.taskBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="count" nameKey="status">
-                    {summary.taskBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {summary.taskBreakdown.map((entry, i) => <Cell key={i} fill={TASK_STATUS_COLORS[entry.status] ?? COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px" }} />
                   <Legend />
