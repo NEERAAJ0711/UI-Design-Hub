@@ -23,6 +23,10 @@ tags:
     description: Task management
   - name: dashboard
     description: Dashboard & analytics
+  - name: designations
+    description: Designation master management
+  - name: companies
+    description: Company master management
 
 paths:
   # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -178,6 +182,148 @@ paths:
       operationId: deleteDepartment
       tags: [departments]
       summary: Delete a department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Designations ──────────────────────────────────────────────────────────────
+  /designations:
+    get:
+      operationId: listDesignations
+      tags: [designations]
+      summary: List all designations
+      responses:
+        "200":
+          description: List of designations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Designation"
+    post:
+      operationId: createDesignation
+      tags: [designations]
+      summary: Create a designation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Designation"
+
+  /designations/{id}:
+    patch:
+      operationId: updateDesignation
+      tags: [designations]
+      summary: Update a designation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignationInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Designation"
+    delete:
+      operationId: deleteDesignation
+      tags: [designations]
+      summary: Delete a designation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Companies ──────────────────────────────────────────────────────────────────
+  /companies:
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: List all companies
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+    post:
+      operationId: createCompany
+      tags: [companies]
+      summary: Create a company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+  /companies/{id}:
+    patch:
+      operationId: updateCompany
+      tags: [companies]
+      summary: Update a company
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+    delete:
+      operationId: deleteCompany
+      tags: [companies]
+      summary: Delete a company
       parameters:
         - name: id
           in: path
@@ -963,6 +1109,36 @@ components:
       properties:
         status:
           type: string
+
+    # ── Designation ─────────────────────────────────────────────────────────────
+    Designation:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        createdAt: { type: string }
+
+    DesignationInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+
+    # ── Company ──────────────────────────────────────────────────────────────────
+    Company:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        createdAt: { type: string }
+
+    CompanyInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
 
     # ── Department ──────────────────────────────────────────────────────────────
     Department:

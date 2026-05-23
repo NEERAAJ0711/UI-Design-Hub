@@ -7,6 +7,8 @@ import krasRouter from "./kras";
 import kpisRouter from "./kpis";
 import tasksRouter from "./tasks";
 import dashboardRouter from "./dashboard";
+import designationsRouter from "./designations";
+import companiesRouter from "./companies";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(krasRouter);
 router.use(kpisRouter);
 router.use(tasksRouter);
 router.use(dashboardRouter);
+router.use(designationsRouter);
+router.use(companiesRouter);
 
 export default router;

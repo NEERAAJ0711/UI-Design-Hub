@@ -5,3 +5,5 @@ export * from "./kpis";
 export * from "./tasks";
 export * from "./task_comments";
 export * from "./activity_log";
+export * from "./designations";
+export * from "./companies";

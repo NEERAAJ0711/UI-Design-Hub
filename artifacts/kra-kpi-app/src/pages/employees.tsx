@@ -5,9 +5,12 @@ import {
   useCreateEmployee,
   useUpdateEmployee,
   useDeleteEmployee,
+  useListDesignations,
+  useListCompanies,
   getListEmployeesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,46 +22,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 
 const ROLES = ["management", "hod", "manager", "employee"] as const;
-
-const DESIGNATIONS = [
-  "Chief Executive Officer",
-  "Chief Operating Officer",
-  "Chief Financial Officer",
-  "Chief Technology Officer",
-  "Vice President",
-  "General Manager",
-  "Deputy General Manager",
-  "Assistant General Manager",
-  "Senior Manager",
-  "Manager",
-  "Assistant Manager",
-  "Team Lead",
-  "Senior Engineer",
-  "Engineer",
-  "Junior Engineer",
-  "Senior Analyst",
-  "Analyst",
-  "Senior Executive",
-  "Executive",
-  "Coordinator",
-  "Intern",
-] as const;
-
-const COMPANIES = [
-  "Acme Group",
-  "Acme Technologies",
-  "Acme Industries",
-  "Acme Services",
-  "Acme Finance",
-  "Acme Retail",
-] as const;
 
 const empSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -75,7 +45,8 @@ type EmpForm = z.infer<typeof empSchema>;
 
 type Employee = {
   id: number; name: string; email: string; role: string; designation?: string | null;
-  departmentId: number; departmentName: string; managerId?: number | null; managerName?: string | null; phone?: string | null; joiningDate?: string | null;
+  company?: string | null; departmentId: number; departmentName: string;
+  managerId?: number | null; managerName?: string | null; phone?: string | null; joiningDate?: string | null;
 };
 
 const roleColors: Record<string, string> = {
@@ -88,8 +59,13 @@ const roleColors: Record<string, string> = {
 export default function Employees() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+
   const { data: employees, isLoading } = useListEmployees();
   const { data: departments } = useListDepartments();
+  const { data: designations } = useListDesignations();
+  const { data: companies } = useListCompanies();
+
   const createEmp = useCreateEmployee();
   const updateEmp = useUpdateEmployee();
   const deleteEmp = useDeleteEmployee();
@@ -99,6 +75,10 @@ export default function Employees() {
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [filterDept, setFilterDept] = useState<string>("all");
   const [filterRole, setFilterRole] = useState<string>("all");
+
+  // HR dept users + admin can add/edit/delete employees
+  const isHR = user?.departmentName?.toLowerCase().includes("hr") ?? false;
+  const canManage = user?.role === "admin" || isHR;
 
   const form = useForm<EmpForm>({
     resolver: zodResolver(empSchema),
@@ -118,7 +98,7 @@ export default function Employees() {
       email: emp.email,
       role: emp.role as typeof ROLES[number],
       designation: emp.designation ?? "",
-      company: (emp as Employee & { company?: string | null }).company ?? "",
+      company: emp.company ?? "",
       departmentId: emp.departmentId,
       managerId: emp.managerId ?? undefined,
       phone: emp.phone ?? "",
@@ -177,11 +157,21 @@ export default function Employees() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Employees</h2>
-          <p className="text-muted-foreground">Manage employee directory, roles, and assignments.</p>
+          <p className="text-muted-foreground">
+            {canManage
+              ? "Manage employee directory, roles, and assignments."
+              : "View employee directory. Contact HR to make changes."}
+          </p>
         </div>
-        <Button data-testid="button-add-employee" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Add Employee
-        </Button>
+        {canManage ? (
+          <Button data-testid="button-add-employee" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> Add Employee
+          </Button>
+        ) : (
+          <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
+            <Lock className="h-3 w-3" /> HR managed
+          </Badge>
+        )}
       </div>
 
       {/* Filters */}
@@ -215,15 +205,16 @@ export default function Employees() {
                 <TableHead>Department</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Designation</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>Manager</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {canManage && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[150, 120, 80, 120, 100, 50].map((w, j) => (
+                    {[150, 120, 80, 120, 100, 100, canManage ? 50 : 0].filter(Boolean).map((w, j) => (
                       <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>
                     ))}
                   </TableRow>
@@ -243,30 +234,33 @@ export default function Employees() {
                         {emp.role}
                       </span>
                     </TableCell>
-                    <TableCell>{emp.designation || "—"}</TableCell>
+                    <TableCell>{(emp as Employee).designation || "—"}</TableCell>
+                    <TableCell>{(emp as Employee).company || <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>{emp.managerName || <span className="text-muted-foreground">—</span>}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" data-testid={`button-actions-employee-${emp.id}`}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(emp)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(emp)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-actions-employee-${emp.id}`}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(emp as Employee)}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(emp as Employee)}>
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={canManage ? 7 : 6} className="h-24 text-center text-muted-foreground">
                     No employees found.
                   </TableCell>
                 </TableRow>
@@ -276,139 +270,141 @@ export default function Employees() {
         </CardContent>
       </Card>
 
-      {/* Create / Edit dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editTarget ? "Edit Employee" : "Add Employee"}</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl><Input data-testid="input-employee-name" placeholder="John Doe" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl><Input type="email" placeholder="john@company.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl><Input placeholder="+91-..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="role" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-employee-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="designation" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Designation</FormLabel>
-                    <Select value={field.value ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select designation" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
-                        {DESIGNATIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="company" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company</FormLabel>
-                    <Select value={field.value ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select company" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
-                        {COMPANIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="departmentId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Department</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-employee-department">
-                          <SelectValue placeholder="Select dept." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="managerId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Manager</FormLabel>
-                    <Select value={field.value?.toString() ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? undefined : Number(v))}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="No manager" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No manager</SelectItem>
-                        {employees?.filter((e) => e.id !== editTarget?.id).map((e) => (
-                          <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="joiningDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Joining Date</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" data-testid="button-submit-employee" disabled={createEmp.isPending || updateEmp.isPending}>
-                  {editTarget ? "Save Changes" : "Add Employee"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      {/* Create / Edit dialog — only rendered when canManage */}
+      {canManage && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editTarget ? "Edit Employee" : "Add Employee"}</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl><Input data-testid="input-employee-name" placeholder="John Doe" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl><Input type="email" placeholder="john@company.com" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="phone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl><Input placeholder="+91-..." {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="role" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-employee-role">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="designation" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Designation</FormLabel>
+                      <Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select designation" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">— None —</SelectItem>
+                          {designations?.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="company" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company</FormLabel>
+                      <Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select company" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">— None —</SelectItem>
+                          {companies?.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="departmentId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-employee-department">
+                            <SelectValue placeholder="Select dept." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="managerId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Manager</FormLabel>
+                      <Select value={field.value?.toString() ?? "none"} onValueChange={(v) => field.onChange(v === "none" ? undefined : Number(v))}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="No manager" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No manager</SelectItem>
+                          {employees?.filter((e) => e.id !== editTarget?.id).map((e) => (
+                            <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="joiningDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Joining Date</FormLabel>
+                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" data-testid="button-submit-employee" disabled={createEmp.isPending || updateEmp.isPending}>
+                    {editTarget ? "Save Changes" : "Add Employee"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

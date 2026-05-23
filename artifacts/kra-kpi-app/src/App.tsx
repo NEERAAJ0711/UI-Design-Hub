@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import Dashboard from "@/pages/dashboard";
-import Departments from "@/pages/departments";
+// Departments page removed — managed via System Admin > Masters tab
 import Employees from "@/pages/employees";
 import Tasks from "@/pages/tasks";
 import KRAs from "@/pages/kras";
@@ -49,9 +49,6 @@ function ProtectedRoutes() {
     <AppLayout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        {isHodOrAbove(user.role) && (
-          <Route path="/departments" component={Departments} />
-        )}
         {isManagerOrAbove(user.role) && (
           <Route path="/employees" component={Employees} />
         )}

@@ -9,6 +9,8 @@
 export * from './activityItem';
 export * from './activityItemType';
 export * from './approveCloseInput';
+export * from './company';
+export * from './companyInput';
 export * from './currentUser';
 export * from './currentUserRole';
 export * from './dashboardSummary';
@@ -16,6 +18,8 @@ export * from './department';
 export * from './departmentInput';
 export * from './departmentPerformance';
 export * from './departmentUpdate';
+export * from './designation';
+export * from './designationInput';
 export * from './employee';
 export * from './employeeDashboardSummary';
 export * from './employeeInput';

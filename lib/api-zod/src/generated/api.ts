@@ -146,6 +146,108 @@ export const DeleteDepartmentParams = zod.object({
 
 
 /**
+ * @summary List all designations
+ */
+export const ListDesignationsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListDesignationsResponse = zod.array(ListDesignationsResponseItem)
+
+
+/**
+ * @summary Create a designation
+ */
+
+
+
+export const CreateDesignationBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+
+/**
+ * @summary Update a designation
+ */
+export const UpdateDesignationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateDesignationBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const UpdateDesignationResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a designation
+ */
+export const DeleteDesignationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List all companies
+ */
+export const ListCompaniesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListCompaniesResponse = zod.array(ListCompaniesResponseItem)
+
+
+/**
+ * @summary Create a company
+ */
+
+
+
+export const CreateCompanyBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+
+/**
+ * @summary Update a company
+ */
+export const UpdateCompanyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateCompanyBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const UpdateCompanyResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a company
+ */
+export const DeleteCompanyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary List employees
  */
 export const ListEmployeesQueryParams = zod.object({

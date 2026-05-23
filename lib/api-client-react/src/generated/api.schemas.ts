@@ -46,6 +46,28 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface Designation {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface DesignationInput {
+  /** @minLength 1 */
+  name: string;
+}
+
+export interface Company {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface CompanyInput {
+  /** @minLength 1 */
+  name: string;
+}
+
 export interface Department {
   id: number;
   name: string;

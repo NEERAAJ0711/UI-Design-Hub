@@ -3,12 +3,26 @@ import {
   useListEmployees,
   useListDepartments,
   useUpdateEmployee,
+  useCreateDepartment,
+  useUpdateDepartment,
+  useDeleteDepartment,
   useGetDashboardSummary,
   useGetPendingApprovals,
   useGetRecentActivity,
   useApproveKraClosure,
   useApproveTaskStatus,
+  useListDesignations,
+  useCreateDesignation,
+  useUpdateDesignation,
+  useDeleteDesignation,
+  useListCompanies,
+  useCreateCompany,
+  useUpdateCompany,
+  useDeleteCompany,
   getListEmployeesQueryKey,
+  getListDepartmentsQueryKey,
+  getListDesignationsQueryKey,
+  getListCompaniesQueryKey,
   getGetPendingApprovalsQueryKey,
   getListKrasQueryKey,
   getListTasksQueryKey,
@@ -19,10 +33,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ShieldAlert, Users, Building2, CheckSquare, Target, BarChart, Bell, CheckCircle2, XCircle, Activity, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  ShieldAlert, Users, Building2, CheckSquare, Target, Bell, CheckCircle2, XCircle,
+  Activity, RefreshCw, Plus, Pencil, Trash2, Briefcase, LayoutList,
+} from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,17 +57,128 @@ const roleColors: Record<string, string> = {
 };
 
 const roleLabels: Record<string, string> = {
-  admin: "System Admin",
-  management: "Management",
-  hod: "HOD",
-  manager: "Manager",
-  employee: "Employee",
+  admin: "System Admin", management: "Management", hod: "HOD", manager: "Manager", employee: "Employee",
 };
 
 const kraStatusColors: Record<string, string> = {
   submitted: "bg-yellow-100 text-yellow-800",
   manager_approved: "bg-orange-100 text-orange-800",
 };
+
+// ── Simple inline Master CRUD section (for Designations & Companies) ──────────
+function MasterSection({
+  title, icon: Icon, items, loading,
+  onCreate, onUpdate, onDelete,
+}: {
+  title: string;
+  icon: React.ElementType;
+  items: { id: number; name: string }[] | undefined;
+  loading: boolean;
+  onCreate: (name: string) => void;
+  onUpdate: (id: number, name: string) => void;
+  onDelete: (id: number, name: string) => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const [editItem, setEditItem] = useState<{ id: number; name: string } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [deleteItem, setDeleteItem] = useState<{ id: number; name: string } | null>(null);
+
+  function submitCreate() {
+    if (!newName.trim()) return;
+    onCreate(newName.trim());
+    setNewName("");
+  }
+
+  function openEdit(item: { id: number; name: string }) {
+    setEditItem(item);
+    setEditName(item.name);
+  }
+
+  function submitEdit() {
+    if (!editItem || !editName.trim()) return;
+    onUpdate(editItem.id, editName.trim());
+    setEditItem(null);
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon className="h-4 w-4" /> {title}
+          <Badge variant="secondary" className="ml-auto">{items?.length ?? 0}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Add new */}
+        <div className="flex gap-2">
+          <Input
+            placeholder={`Add new ${title.toLowerCase().replace(/s$/, "")}…`}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitCreate()}
+            className="h-8 text-sm"
+          />
+          <Button size="sm" onClick={submitCreate} disabled={!newName.trim()} className="h-8">
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add
+          </Button>
+        </div>
+
+        {/* List */}
+        <div className="border rounded-md divide-y max-h-60 overflow-y-auto">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-3 py-2"><Skeleton className="h-4 w-full" /></div>
+            ))
+          ) : items?.length ? (
+            items.map((item) => (
+              <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/30">
+                <span className="text-sm">{item.name}</span>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(item)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setDeleteItem(item)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-4">No {title.toLowerCase()} added yet.</p>
+          )}
+        </div>
+      </CardContent>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editItem} onOpenChange={(o) => !o && setEditItem(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Edit {title.replace(/s$/, "")}</DialogTitle></DialogHeader>
+          <Input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitEdit()} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditItem(null)}>Cancel</Button>
+            <Button onClick={submitEdit} disabled={!editName.trim()}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteItem} onOpenChange={(o) => !o && setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteItem?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently remove this {title.toLowerCase().replace(/s$/, "")}.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={() => { onDelete(deleteItem!.id, deleteItem!.name); setDeleteItem(null); }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
 
 export default function Admin() {
   const queryClient = useQueryClient();
@@ -57,6 +187,8 @@ export default function Admin() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: employees, isLoading: loadingEmps } = useListEmployees();
   const { data: departments } = useListDepartments();
+  const { data: designations, isLoading: loadingDesig } = useListDesignations();
+  const { data: companies, isLoading: loadingComp } = useListCompanies();
   const { data: pendingData, isLoading: loadingPending } = useGetPendingApprovals();
   const { data: recentActivity } = useGetRecentActivity({ limit: 20 });
 
@@ -64,26 +196,44 @@ export default function Admin() {
   const approveKra = useApproveKraClosure();
   const approveTask = useApproveTaskStatus();
 
+  // Department mutations
+  const createDept = useCreateDepartment();
+  const updateDept = useUpdateDepartment();
+  const deleteDept = useDeleteDepartment();
+
+  // Designation mutations
+  const createDesig = useCreateDesignation();
+  const updateDesig = useUpdateDesignation();
+  const deleteDesig = useDeleteDesignation();
+
+  // Company mutations
+  const createComp = useCreateCompany();
+  const updateComp = useUpdateCompany();
+  const deleteComp = useDeleteCompany();
+
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ id: number; name: string; newRole: RoleType } | null>(null);
   const [filterDept, setFilterDept] = useState("all");
 
-  const deptMap = new Map((departments ?? []).map((d) => [d.id, d.name]));
+  // Dept dialog state
+  const [deptDialog, setDeptDialog] = useState(false);
+  const [deptEdit, setDeptEdit] = useState<{ id: number; name: string; description?: string | null } | null>(null);
+  const [deptName, setDeptName] = useState("");
+  const [deptDesc, setDeptDesc] = useState("");
+  const [deptDeleteTarget, setDeptDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
+  const deptMap = new Map((departments ?? []).map((d) => [d.id, d.name]));
   const totalPending = (pendingData?.kras?.length ?? 0) + (pendingData?.tasks?.length ?? 0);
 
   function confirmRoleChange() {
     if (!roleChangeTarget) return;
-    updateEmployee.mutate(
-      { id: roleChangeTarget.id, data: { role: roleChangeTarget.newRole } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListEmployeesQueryKey() });
-          setRoleChangeTarget(null);
-          toast({ title: `Role updated for ${roleChangeTarget.name}` });
-        },
-        onError: () => toast({ title: "Failed to update role", variant: "destructive" }),
-      }
-    );
+    updateEmployee.mutate({ id: roleChangeTarget.id, data: { role: roleChangeTarget.newRole } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEmployeesQueryKey() });
+        setRoleChangeTarget(null);
+        toast({ title: `Role updated for ${roleChangeTarget.name}` });
+      },
+      onError: () => toast({ title: "Failed to update role", variant: "destructive" }),
+    });
   }
 
   function handleRoleSelect(emp: { id: number; name: string; role: string }, newRole: string) {
@@ -111,6 +261,69 @@ export default function Admin() {
     });
   }
 
+  // ── Department CRUD ──────────────────────────────────────────────────────────
+  function openDeptCreate() {
+    setDeptEdit(null); setDeptName(""); setDeptDesc(""); setDeptDialog(true);
+  }
+  function openDeptEdit(d: { id: number; name: string; description?: string | null }) {
+    setDeptEdit(d); setDeptName(d.name); setDeptDesc(d.description ?? ""); setDeptDialog(true);
+  }
+  function submitDept() {
+    if (!deptName.trim()) return;
+    const payload = { name: deptName.trim(), description: deptDesc.trim() || undefined };
+    if (deptEdit) {
+      updateDept.mutate({ id: deptEdit.id, data: payload }, {
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDepartmentsQueryKey() }); setDeptDialog(false); toast({ title: "Department updated" }); },
+      });
+    } else {
+      createDept.mutate({ data: payload }, {
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDepartmentsQueryKey() }); setDeptDialog(false); toast({ title: "Department created" }); },
+      });
+    }
+  }
+  function confirmDeptDelete() {
+    if (!deptDeleteTarget) return;
+    deleteDept.mutate({ id: deptDeleteTarget.id }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDepartmentsQueryKey() }); setDeptDeleteTarget(null); toast({ title: "Department deleted" }); },
+    });
+  }
+
+  // ── Designation CRUD ─────────────────────────────────────────────────────────
+  function handleCreateDesig(name: string) {
+    createDesig.mutate({ data: { name } }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDesignationsQueryKey() }); toast({ title: "Designation added" }); },
+      onError: () => toast({ title: "Already exists or failed", variant: "destructive" }),
+    });
+  }
+  function handleUpdateDesig(id: number, name: string) {
+    updateDesig.mutate({ id, data: { name } }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDesignationsQueryKey() }); toast({ title: "Designation updated" }); },
+    });
+  }
+  function handleDeleteDesig(id: number) {
+    deleteDesig.mutate({ id }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListDesignationsQueryKey() }); toast({ title: "Designation deleted" }); },
+    });
+  }
+
+  // ── Company CRUD ─────────────────────────────────────────────────────────────
+  function handleCreateComp(name: string) {
+    createComp.mutate({ data: { name } }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() }); toast({ title: "Company added" }); },
+      onError: () => toast({ title: "Already exists or failed", variant: "destructive" }),
+    });
+  }
+  function handleUpdateComp(id: number, name: string) {
+    updateComp.mutate({ id, data: { name } }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() }); toast({ title: "Company updated" }); },
+    });
+  }
+  function handleDeleteComp(id: number) {
+    deleteComp.mutate({ id }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() }); toast({ title: "Company deleted" }); },
+    });
+  }
+
   const filteredEmployees = employees?.filter((e) =>
     filterDept === "all" || e.departmentId === Number(filterDept)
   );
@@ -124,19 +337,19 @@ export default function Admin() {
         </div>
         <div>
           <h2 className="text-3xl font-bold tracking-tight">System Administration</h2>
-          <p className="text-muted-foreground">Full system control — user management, role assignment, and company-wide approvals.</p>
+          <p className="text-muted-foreground">Full system control — user management, master data, and company-wide approvals.</p>
         </div>
       </div>
 
       <div className="rounded-lg border border-red-200 bg-red-50/70 dark:bg-red-950/20 dark:border-red-900/30 px-4 py-2.5 flex items-center gap-2">
         <ShieldAlert className="h-4 w-4 text-red-500 shrink-0" />
-        <p className="text-sm text-red-700 dark:text-red-400 font-medium">Admin Mode: Changes made here affect all users and roles system-wide.</p>
+        <p className="text-sm text-red-700 dark:text-red-400 font-medium">Admin Mode: Changes made here affect all users and data system-wide.</p>
       </div>
 
       {/* System Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard icon={<Users className="h-4 w-4" />} title="Total Users" value={summary?.totalEmployees} loading={loadingSummary} />
-        <StatCard icon={<Building2 className="h-4 w-4" />} title="Departments" value={summary?.totalDepartments} loading={loadingSummary} />
+        <StatCard icon={<Building2 className="h-4 w-4" />} title="Departments" value={departments?.length ?? summary?.totalDepartments} loading={loadingSummary} />
         <StatCard icon={<CheckSquare className="h-4 w-4" />} title="Total Tasks" value={summary?.totalTasks} loading={loadingSummary} />
         <StatCard icon={<Target className="h-4 w-4" />} title="Avg KPI Score" value={summary?.avgKpiScore?.toFixed(1) ?? "—"} loading={loadingSummary} />
         <StatCard
@@ -150,9 +363,12 @@ export default function Admin() {
 
       {/* Tabs */}
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-lg">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" /> Users
+          </TabsTrigger>
+          <TabsTrigger value="masters" className="flex items-center gap-2">
+            <LayoutList className="h-4 w-4" /> Masters
           </TabsTrigger>
           <TabsTrigger value="approvals" className="flex items-center gap-2">
             <Bell className="h-4 w-4" /> Approvals
@@ -172,7 +388,7 @@ export default function Admin() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>User Management</CardTitle>
-                  <CardDescription>View all users and change their roles. Role changes take effect at next login.</CardDescription>
+                  <CardDescription>View all users and change their system roles.</CardDescription>
                 </div>
                 <Select value={filterDept} onValueChange={setFilterDept}>
                   <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
@@ -215,13 +431,8 @@ export default function Admin() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={emp.role}
-                            onValueChange={(newRole) => handleRoleSelect(emp, newRole)}
-                          >
-                            <SelectTrigger className="w-[140px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
+                          <Select value={emp.role} onValueChange={(newRole) => handleRoleSelect(emp, newRole)}>
+                            <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {ROLES.map((r) => (
                                 <SelectItem key={r} value={r} className="text-xs">
@@ -247,6 +458,86 @@ export default function Admin() {
           </Card>
         </TabsContent>
 
+        {/* ── Masters Tab ── */}
+        <TabsContent value="masters">
+          <div className="space-y-4">
+            {/* Departments */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Building2 className="h-4 w-4" /> Departments
+                    <Badge variant="secondary" className="ml-2">{departments?.length ?? 0}</Badge>
+                  </CardTitle>
+                  <Button size="sm" onClick={openDeptCreate} className="h-8">
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  </Button>
+                </div>
+                <CardDescription>Manage company departments. Deleting a department may affect employees assigned to it.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Employees</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {!departments ? (
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <TableRow key={i}>
+                          {Array.from({ length: 4 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                        </TableRow>
+                      ))
+                    ) : departments.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-medium">{d.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{d.description ?? "—"}</TableCell>
+                        <TableCell className="text-right">{d.employeeCount ?? 0}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeptEdit(d)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeptDeleteTarget(d)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Designations + Companies side by side */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <MasterSection
+                title="Designations"
+                icon={Briefcase}
+                items={designations}
+                loading={loadingDesig}
+                onCreate={handleCreateDesig}
+                onUpdate={handleUpdateDesig}
+                onDelete={handleDeleteDesig}
+              />
+              <MasterSection
+                title="Companies"
+                icon={Building2}
+                items={companies}
+                loading={loadingComp}
+                onCreate={handleCreateComp}
+                onUpdate={handleUpdateComp}
+                onDelete={handleDeleteComp}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
         {/* ── Approvals Tab ── */}
         <TabsContent value="approvals">
           <Card>
@@ -264,7 +555,6 @@ export default function Admin() {
                 <div className="text-center py-12 text-muted-foreground">
                   <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
                   <p className="text-sm font-medium">No pending approvals</p>
-                  <p className="text-xs mt-1">All requests have been actioned.</p>
                 </div>
               ) : (
                 <div className="space-y-5">
@@ -279,9 +569,7 @@ export default function Admin() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{kra.title}</p>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <p className="text-xs text-muted-foreground">{kra.employeeName}</p>
-                                <span className="text-xs text-muted-foreground">·</span>
-                                <p className="text-xs text-muted-foreground">{kra.departmentName}</p>
+                                <p className="text-xs text-muted-foreground">{kra.employeeName} · {kra.departmentName}</p>
                                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${kraStatusColors[kra.kraStatus] ?? ""}`}>
                                   {kra.kraStatus.replace("_", " ")}
                                 </span>
@@ -353,9 +641,7 @@ export default function Admin() {
                 {recentActivity?.length ? recentActivity.map((a) => (
                   <div key={a.id} className="flex items-start justify-between py-2.5 border-b last:border-0">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5">
-                        <ActivityDot type={a.type} />
-                      </div>
+                      <div className="mt-0.5"><ActivityDot type={a.type} /></div>
                       <div>
                         <p className="text-sm font-medium">{a.description}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -373,7 +659,7 @@ export default function Admin() {
         </TabsContent>
       </Tabs>
 
-      {/* Role change confirmation dialog */}
+      {/* Role change confirmation */}
       <AlertDialog open={!!roleChangeTarget} onOpenChange={(open) => !open && setRoleChangeTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -392,6 +678,43 @@ export default function Admin() {
             <AlertDialogAction onClick={confirmRoleChange} disabled={updateEmployee.isPending}>
               <RefreshCw className="mr-2 h-3.5 w-3.5" /> Confirm Change
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Department create/edit dialog */}
+      <Dialog open={deptDialog} onOpenChange={setDeptDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{deptEdit ? "Edit Department" : "Add Department"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Name</label>
+              <Input className="mt-1" value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="e.g. Engineering" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input className="mt-1" value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Brief description…" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeptDialog(false)}>Cancel</Button>
+            <Button onClick={submitDept} disabled={!deptName.trim() || createDept.isPending || updateDept.isPending}>
+              {deptEdit ? "Save Changes" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Department delete confirm */}
+      <AlertDialog open={!!deptDeleteTarget} onOpenChange={(o) => !o && setDeptDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deptDeleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete the department. Employees in this department may be left unassigned.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={confirmDeptDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -419,18 +742,10 @@ function StatCard({ icon, title, value, loading, valueClass }: {
 
 function ActivityDot({ type }: { type: string }) {
   const colors: Record<string, string> = {
-    task_created: "bg-blue-500",
-    task_completed: "bg-green-500",
-    task_delayed: "bg-red-500",
-    task_status_requested: "bg-yellow-500",
-    task_status_approved: "bg-green-400",
-    task_status_rejected: "bg-red-400",
-    kra_submitted: "bg-yellow-500",
-    kra_approved: "bg-green-500",
-    kra_rejected: "bg-red-500",
-    kra_scored: "bg-blue-400",
-    kpi_created: "bg-purple-500",
-    employee_created: "bg-indigo-500",
+    task_created: "bg-blue-500", task_completed: "bg-green-500", task_delayed: "bg-red-500",
+    task_status_requested: "bg-yellow-500", task_status_approved: "bg-green-400", task_status_rejected: "bg-red-400",
+    kra_submitted: "bg-yellow-500", kra_approved: "bg-green-500", kra_rejected: "bg-red-500",
+    kra_scored: "bg-blue-400", kpi_created: "bg-purple-500", employee_created: "bg-indigo-500",
   };
   return <span className={`block h-2 w-2 mt-1.5 rounded-full shrink-0 ${colors[type] ?? "bg-gray-400"}`} />;
 }
