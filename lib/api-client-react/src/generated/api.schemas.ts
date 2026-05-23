@@ -354,6 +354,7 @@ export const TaskStatus = {
   approved: 'approved',
   rejected: 'rejected',
   awaiting_hod_approval: 'awaiting_hod_approval',
+  closed: 'closed',
 } as const;
 
 export type TaskPriority = typeof TaskPriority[keyof typeof TaskPriority];
@@ -394,6 +395,8 @@ export interface Task {
   completedAt?: string | null;
   createdById: number;
   createdByName?: string;
+  /** @nullable */
+  createdByDesignation?: string | null;
   assignedToId: number;
   assignedToName?: string;
   departmentId: number;
@@ -403,6 +406,20 @@ export interface Task {
   recurringFreq?: TaskRecurringFreq;
   progressPct?: number;
   createdAt: string;
+  /** @nullable */
+  approvedById?: number | null;
+  /** @nullable */
+  approvedByName?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  approvalRemarks?: string | null;
+  /** @nullable */
+  closedById?: number | null;
+  /** @nullable */
+  closedByName?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
 }
 
 export type TaskInputPriority = typeof TaskInputPriority[keyof typeof TaskInputPriority];
@@ -480,10 +497,13 @@ export const TaskStatusInputStatus = {
   approved: 'approved',
   rejected: 'rejected',
   awaiting_hod_approval: 'awaiting_hod_approval',
+  closed: 'closed',
 } as const;
 
 export interface TaskStatusInput {
   status: TaskStatusInputStatus;
+  approverId?: number;
+  approvalRemarks?: string;
 }
 
 export interface TaskComment {

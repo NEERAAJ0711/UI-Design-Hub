@@ -9,4 +9,6 @@ import type { TaskStatusInputStatus } from './taskStatusInputStatus';
 
 export interface TaskStatusInput {
   status: TaskStatusInputStatus;
+  approverId?: number;
+  approvalRemarks?: string;
 }

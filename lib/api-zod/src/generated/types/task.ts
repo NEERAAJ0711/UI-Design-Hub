@@ -24,6 +24,8 @@ export interface Task {
   completedAt?: string | null;
   createdById: number;
   createdByName?: string;
+  /** @nullable */
+  createdByDesignation?: string | null;
   assignedToId: number;
   assignedToName?: string;
   departmentId: number;
@@ -33,4 +35,18 @@ export interface Task {
   recurringFreq?: TaskRecurringFreq;
   progressPct?: number;
   createdAt: string;
+  /** @nullable */
+  approvedById?: number | null;
+  /** @nullable */
+  approvedByName?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  approvalRemarks?: string | null;
+  /** @nullable */
+  closedById?: number | null;
+  /** @nullable */
+  closedByName?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
 }

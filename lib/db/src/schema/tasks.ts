@@ -6,12 +6,19 @@ export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  status: text("status").notNull().default("pending"), // pending | in_progress | completed | delayed | approved | rejected
+  status: text("status").notNull().default("pending"), // pending | in_progress | completed | delayed | approved | rejected | closed | awaiting_hod_approval
   requestedStatus: text("requested_status"), // employee's pending status change request
   statusRequestedAt: timestamp("status_requested_at", { withTimezone: true }),
   priority: text("priority").notNull().default("medium"), // high | medium | low
   dueDate: text("due_date"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  // Approval tracking
+  approvedById: integer("approved_by_id"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  approvalRemarks: text("approval_remarks"),
+  // Creator acceptance tracking
+  closedById: integer("closed_by_id"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   createdById: integer("created_by_id").notNull(),
   assignedToId: integer("assigned_to_id").notNull(),
   departmentId: integer("department_id").notNull(),

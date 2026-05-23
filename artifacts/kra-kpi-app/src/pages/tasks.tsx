@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 
-const STATUSES = ["pending", "in_progress", "completed", "delayed", "approved", "rejected"] as const;
+const STATUSES = ["pending", "in_progress", "completed", "delayed", "approved", "rejected", "closed"] as const;
 const EMPLOYEE_REQUESTABLE = ["in_progress", "completed", "delayed"] as const;
 const PRIORITIES = ["high", "medium", "low"] as const;
 const FREQS = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
@@ -55,6 +55,8 @@ const statusColors: Record<string, string> = {
   delayed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
   approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
   rejected: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
+  awaiting_hod_approval: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  closed: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300",
 };
 
 const priorityColors: Record<string, string> = {
@@ -410,13 +412,13 @@ function FullTasks() {
     }
   }
 
-  function changeStatus(taskId: number, status: string) {
-    updateStatus.mutate({ id: taskId, data: { status: status as typeof STATUSES[number] } }, {
+  function changeStatus(taskId: number, status: string, opts?: { approverId?: number; approvalRemarks?: string }) {
+    updateStatus.mutate({ id: taskId, data: { status: status as typeof STATUSES[number], approverId: opts?.approverId, approvalRemarks: opts?.approvalRemarks } }, {
       onSuccess: () => {
         invalidateAllTaskQueries();
         queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
         if (detailId === taskId) queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
-        toast({ title: `Status updated to ${status.replace("_", " ")}` });
+        toast({ title: `Status updated to ${status.replace(/_/g, " ")}` });
       },
     });
   }
@@ -773,14 +775,14 @@ function FullTasks() {
   );
 }
 
-// ── Task Detail Sheet ─────────────────────────────────────────────────────────
+// ── Task Detail Modal ─────────────────────────────────────────────────────────
 function TaskDetailSheet({
   taskId, employees, onClose, onStatusChange, readOnly = false,
 }: {
   taskId: number;
   employees: { id: number; name: string }[];
   onClose: () => void;
-  onStatusChange: (id: number, status: string) => void;
+  onStatusChange: (id: number, status: string, opts?: { approverId?: number; approvalRemarks?: string }) => void;
   readOnly?: boolean;
 }) {
   const { user } = useAuth();
@@ -789,6 +791,7 @@ function TaskDetailSheet({
   const { data: task, isLoading } = useGetTask(taskId, { query: { queryKey: getGetTaskQueryKey(taskId) } });
   const { data: comments } = useListTaskComments(taskId, { query: { queryKey: getListTaskCommentsQueryKey(taskId) } });
   const addComment = useAddTaskComment();
+  const [remarksInput, setRemarksInput] = useState("");
 
   const commentForm = useForm<CommentForm>({
     resolver: zodResolver(commentSchema),
@@ -805,89 +808,274 @@ function TaskDetailSheet({
     });
   }
 
+  function handleApprove() {
+    onStatusChange(taskId, "approved", { approverId: user?.id, approvalRemarks: remarksInput || undefined });
+    setRemarksInput("");
+  }
+
+  function handleClose() {
+    onStatusChange(taskId, "closed", { approverId: user?.id });
+  }
+
+  const isCreator = task?.createdById === user?.id;
+  const canManageStatus = !readOnly;
+  const canApprove = canManageStatus && (user?.role === "hod" || user?.role === "manager" || user?.role === "management" || user?.role === "admin");
+  const canCreatorClose = isCreator && task?.status === "approved";
+  const isClosed = task?.status === "closed";
+
+  const managementStatuses = STATUSES.filter((s) => s !== "closed");
+
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader><SheetTitle>Task Detail</SheetTitle></SheetHeader>
-        {isLoading ? (
-          <div className="space-y-4 mt-4"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-20 w-full" /></div>
-        ) : task ? (
-          <div className="mt-4 space-y-5">
-            <div>
-              <h3 className="text-lg font-semibold">{task.title}</h3>
-              {task.description && <p className="text-sm text-muted-foreground mt-1">{task.description}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">Assignee:</span> <span className="font-medium">{task.assignedToName}</span></div>
-              <div><span className="text-muted-foreground">Department:</span> <span className="font-medium">{task.departmentName}</span></div>
-              <div><span className="text-muted-foreground">Priority:</span>
-                <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
-              </div>
-              <div><span className="text-muted-foreground">Due:</span> <span className="font-medium">{task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—"}</span></div>
-              <div><span className="text-muted-foreground">Status:</span>
-                <span className={`ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[task.status] ?? ""}`}>{task.status.replace("_", " ")}</span>
-              </div>
-              {task.requestedStatus && (
-                <div><span className="text-muted-foreground">Requested:</span>
-                  <span className="ml-1.5 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Pending: {task.requestedStatus.replace("_", " ")}</span>
-                </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-3">
+              <DialogTitle className="text-xl font-bold leading-tight pr-4">
+                {isLoading ? <Skeleton className="h-6 w-64" /> : task?.title ?? "Task Detail"}
+              </DialogTitle>
+              {task && (
+                <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[task.status] ?? ""}`}>
+                  {task.status.replace(/_/g, " ")}
+                </span>
               )}
             </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Progress</div>
-              <div className="flex items-center gap-2">
-                <Progress value={task.progressPct} className="flex-1 h-2" />
-                <span className="text-sm font-medium">{task.progressPct}%</span>
+            {task?.description && (
+              <p className="text-sm text-muted-foreground mt-2">{task.description}</p>
+            )}
+          </DialogHeader>
+        </div>
+
+        {isLoading ? (
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : task ? (
+          <div className="px-6 pb-6 space-y-5 mt-4">
+
+            {/* ── A. Task Information ─────────────────────────────── */}
+            <div className="rounded-xl border bg-muted/30 overflow-hidden">
+              <div className="px-4 py-2.5 bg-muted/60 border-b flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">A · Task Information</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Created By</p>
+                  <p className="font-semibold">{task.createdByName || "—"}</p>
+                  {task.createdByDesignation && (
+                    <p className="text-xs text-muted-foreground">{task.createdByDesignation}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Department</p>
+                  <p className="font-semibold">{task.departmentName || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Designation</p>
+                  <p className="font-semibold">{task.createdByDesignation || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Date &amp; Time of Creation</p>
+                  <p className="font-semibold">{format(new Date(task.createdAt), "dd MMM yyyy, h:mm a")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Assigned To</p>
+                  <p className="font-semibold">{task.assignedToName || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Due Date</p>
+                  <p className="font-semibold">{task.dueDate ? format(new Date(task.dueDate), "dd MMM yyyy") : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Priority</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Progress</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Progress value={task.progressPct} className="flex-1 h-1.5" />
+                    <span className="text-xs font-medium w-8">{task.progressPct}%</span>
+                  </div>
+                </div>
               </div>
             </div>
-            {!readOnly && (
-              <div>
-                <div className="text-sm font-medium mb-2">Update Status</div>
-                <div className="flex flex-wrap gap-2">
-                  {STATUSES.map((s) => (
-                    <Button key={s} size="sm" variant={task.status === s ? "default" : "outline"} className="capitalize text-xs" onClick={() => onStatusChange(taskId, s)}>
-                      {s.replace("_", " ")}
+
+            {/* ── B. Approval Information ─────────────────────────── */}
+            <div className="rounded-xl border bg-muted/30 overflow-hidden">
+              <div className="px-4 py-2.5 bg-muted/60 border-b flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">B · Approval Information</span>
+              </div>
+              <div className="p-4 text-sm space-y-3">
+                {task.approvedByName ? (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Approved By</p>
+                      <p className="font-semibold">{task.approvedByName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Approved Date &amp; Time</p>
+                      <p className="font-semibold">{task.approvedAt ? format(new Date(task.approvedAt), "dd MMM yyyy, h:mm a") : "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Approval Remarks</p>
+                      <p className={task.approvalRemarks ? "font-medium" : "text-muted-foreground italic"}>{task.approvalRemarks || "No remarks provided"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Not yet approved.</p>
+                )}
+
+                {/* Approval action: HOD/Manager can approve with remarks */}
+                {canApprove && task.status !== "approved" && task.status !== "closed" && task.status !== "rejected" && (
+                  <div className="border-t pt-3 mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Approve this task</p>
+                    <Textarea
+                      placeholder="Approval remarks (optional)..."
+                      rows={2}
+                      className="text-sm"
+                      value={remarksInput}
+                      onChange={(e) => setRemarksInput(e.target.value)}
+                    />
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove}>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Approve Task
                     </Button>
-                  ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── C. Update Status ─────────────────────────────────── */}
+            {canManageStatus && !isClosed && (
+              <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                <div className="px-4 py-2.5 bg-muted/60 border-b flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">C · Update Status</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {managementStatuses.map((s) => (
+                      <Button
+                        key={s}
+                        size="sm"
+                        variant={task.status === s ? "default" : "outline"}
+                        className={`capitalize text-xs ${task.status === s ? "" : ""}`}
+                        onClick={() => {
+                          if (s === "approved") { handleApprove(); }
+                          else { onStatusChange(taskId, s, { approverId: user?.id }); }
+                        }}
+                      >
+                        {s.replace(/_/g, " ")}
+                      </Button>
+                    ))}
+                  </div>
+                  {/* Prominent CLOSED button — shown to creator after approval */}
+                  {canCreatorClose && (
+                    <div className="border-t pt-3">
+                      <Button
+                        size="default"
+                        className="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold"
+                        onClick={handleClose}
+                      >
+                        ✓ Mark as CLOSED — Accept &amp; Close Task
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1.5 text-center">As the task creator, closing this confirms you accept the completed work.</p>
+                    </div>
+                  )}
+                  {task.requestedStatus && (
+                    <p className="text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
+                      Employee requested status change to: <strong className="capitalize">{task.requestedStatus.replace(/_/g, " ")}</strong>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-semibold mb-3">Comments ({comments?.length ?? 0})</h4>
-              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
-                {comments?.map((c) => (
-                  <div key={c.id} className="bg-muted rounded-lg p-3 text-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium">{c.authorName}</span>
-                      <span className="text-xs text-muted-foreground">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
-                    </div>
-                    <p>{c.content}</p>
-                  </div>
-                ))}
-                {!comments?.length && <p className="text-sm text-muted-foreground">No comments yet.</p>}
+
+            {/* ── D. Approved & Accepted By Creator ────────────────── */}
+            <div className="rounded-xl border bg-muted/30 overflow-hidden">
+              <div className="px-4 py-2.5 bg-muted/60 border-b flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">D · Approved &amp; Accepted By Creator</span>
               </div>
-              <Form {...commentForm}>
-                <form onSubmit={commentForm.handleSubmit(submitComment)} className="space-y-2">
-                  {!user && (
-                    <FormField control={commentForm.control} name="authorId" render={({ field }) => (
-                      <FormItem>
-                        <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
-                          <SelectTrigger><SelectValue placeholder="Comment as..." /></SelectTrigger>
-                          <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </FormItem>
+              <div className="p-4 text-sm">
+                {task.closedByName ? (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Accepted By</p>
+                      <p className="font-semibold text-emerald-700">{task.closedByName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Accepted Date &amp; Time</p>
+                      <p className="font-semibold">{task.closedAt ? format(new Date(task.closedAt), "dd MMM yyyy, h:mm a") : "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Task fully closed and accepted
+                      </span>
+                    </div>
+                  </div>
+                ) : canCreatorClose ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">This task has been approved. You can close and accept it below.</p>
+                    <Button
+                      size="default"
+                      className="bg-slate-700 hover:bg-slate-800 text-white font-semibold"
+                      onClick={handleClose}
+                    >
+                      ✓ Accept &amp; Close Task
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Pending creator acceptance.</p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Comments ─────────────────────────────────────────── */}
+            <div className="rounded-xl border bg-muted/30 overflow-hidden">
+              <div className="px-4 py-2.5 bg-muted/60 border-b flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Comments</span>
+                <span className="text-xs bg-muted px-1.5 py-0.5 rounded-full font-medium">{comments?.length ?? 0}</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {comments?.map((c) => (
+                    <div key={c.id} className="bg-background rounded-lg p-3 text-sm border">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-xs">{c.authorName}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(c.createdAt), "dd MMM, h:mm a")}</span>
+                      </div>
+                      <p className="text-sm">{c.content}</p>
+                    </div>
+                  ))}
+                  {!comments?.length && <p className="text-sm text-muted-foreground italic">No comments yet.</p>}
+                </div>
+                <Form {...commentForm}>
+                  <form onSubmit={commentForm.handleSubmit(submitComment)} className="space-y-2 border-t pt-3">
+                    {!user && (
+                      <FormField control={commentForm.control} name="authorId" render={({ field }) => (
+                        <FormItem>
+                          <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
+                            <SelectTrigger><SelectValue placeholder="Comment as..." /></SelectTrigger>
+                            <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormField control={commentForm.control} name="content" render={({ field }) => (
+                      <FormItem><FormControl><Textarea placeholder="Add a comment..." rows={2} {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
-                  )}
-                  <FormField control={commentForm.control} name="content" render={({ field }) => (
-                    <FormItem><FormControl><Textarea placeholder="Add a comment..." rows={2} {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <Button type="submit" size="sm" disabled={addComment.isPending}>Post Comment</Button>
-                </form>
-              </Form>
+                    <Button type="submit" size="sm" disabled={addComment.isPending}>
+                      <Send className="h-3.5 w-3.5 mr-1.5" /> Post Comment
+                    </Button>
+                  </form>
+                </Form>
+              </div>
             </div>
           </div>
-        ) : <p className="text-sm text-muted-foreground mt-4">Task not found.</p>}
-      </SheetContent>
-    </Sheet>
+        ) : (
+          <div className="p-6"><p className="text-sm text-muted-foreground">Task not found.</p></div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

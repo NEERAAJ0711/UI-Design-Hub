@@ -735,13 +735,14 @@ export const ListTasksResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -749,7 +750,14 @@ export const ListTasksResponseItem = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 export const ListTasksResponse = zod.array(ListTasksResponseItem)
 
@@ -784,13 +792,14 @@ export const GetTaskResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -798,7 +807,14 @@ export const GetTaskResponse = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 
 
@@ -824,13 +840,14 @@ export const UpdateTaskResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -838,7 +855,14 @@ export const UpdateTaskResponse = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 
 
@@ -858,20 +882,23 @@ export const UpdateTaskStatusParams = zod.object({
 })
 
 export const UpdateTaskStatusBody = zod.object({
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval'])
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
+  "approverId": zod.number().optional(),
+  "approvalRemarks": zod.string().optional()
 })
 
 export const UpdateTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -879,7 +906,14 @@ export const UpdateTaskStatusResponse = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 
 
@@ -899,13 +933,14 @@ export const RequestTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -913,7 +948,14 @@ export const RequestTaskStatusResponse = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 
 
@@ -933,13 +975,14 @@ export const ApproveTaskStatusResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -947,7 +990,14 @@ export const ApproveTaskStatusResponse = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 
 
@@ -1049,13 +1099,14 @@ export const GetOverdueTasksResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval']),
+  "status": zod.enum(['pending', 'in_progress', 'completed', 'delayed', 'approved', 'rejected', 'awaiting_hod_approval', 'closed']),
   "requestedStatus": zod.string().nullish(),
   "priority": zod.enum(['high', 'medium', 'low']),
   "dueDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdById": zod.number(),
   "createdByName": zod.string().optional(),
+  "createdByDesignation": zod.string().nullish(),
   "assignedToId": zod.number(),
   "assignedToName": zod.string().optional(),
   "departmentId": zod.number(),
@@ -1063,7 +1114,14 @@ export const GetOverdueTasksResponseItem = zod.object({
   "isRecurring": zod.boolean().optional(),
   "recurringFreq": zod.union([zod.literal('daily'),zod.literal('weekly'),zod.literal('monthly'),zod.literal('quarterly'),zod.literal('yearly'),zod.literal(null)]).nullish(),
   "progressPct": zod.number().optional(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "approvedById": zod.number().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "approvalRemarks": zod.string().nullish(),
+  "closedById": zod.number().nullish(),
+  "closedByName": zod.string().nullish(),
+  "closedAt": zod.string().nullish()
 })
 export const GetOverdueTasksResponse = zod.array(GetOverdueTasksResponseItem)
 

@@ -1468,24 +1468,32 @@ components:
       type: object
       required: [id, title, status, priority, createdById, assignedToId, departmentId, createdAt]
       properties:
-        id:               { type: integer }
-        title:            { type: string }
-        description:      { type: ["string", "null"] }
-        status:           { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval] }
-        requestedStatus:  { type: ["string", "null"] }
-        priority:         { type: string, enum: [high, medium, low] }
-        dueDate:          { type: ["string", "null"] }
-        completedAt:      { type: ["string", "null"] }
-        createdById:      { type: integer }
-        createdByName:    { type: string }
-        assignedToId:     { type: integer }
-        assignedToName:   { type: string }
-        departmentId:     { type: integer }
-        departmentName:   { type: string }
-        isRecurring:      { type: boolean }
-        recurringFreq:    { type: ["string", "null"], enum: [daily, weekly, monthly, quarterly, yearly, null] }
-        progressPct:      { type: integer }
-        createdAt:        { type: string }
+        id:                    { type: integer }
+        title:                 { type: string }
+        description:           { type: ["string", "null"] }
+        status:                { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval, closed] }
+        requestedStatus:       { type: ["string", "null"] }
+        priority:              { type: string, enum: [high, medium, low] }
+        dueDate:               { type: ["string", "null"] }
+        completedAt:           { type: ["string", "null"] }
+        createdById:           { type: integer }
+        createdByName:         { type: string }
+        createdByDesignation:  { type: ["string", "null"] }
+        assignedToId:          { type: integer }
+        assignedToName:        { type: string }
+        departmentId:          { type: integer }
+        departmentName:        { type: string }
+        isRecurring:           { type: boolean }
+        recurringFreq:         { type: ["string", "null"], enum: [daily, weekly, monthly, quarterly, yearly, null] }
+        progressPct:           { type: integer }
+        createdAt:             { type: string }
+        approvedById:          { type: ["integer", "null"] }
+        approvedByName:        { type: ["string", "null"] }
+        approvedAt:            { type: ["string", "null"] }
+        approvalRemarks:       { type: ["string", "null"] }
+        closedById:            { type: ["integer", "null"] }
+        closedByName:          { type: ["string", "null"] }
+        closedAt:              { type: ["string", "null"] }
 
     TaskInput:
       type: object
@@ -1517,7 +1525,9 @@ components:
       type: object
       required: [status]
       properties:
-        status: { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval] }
+        status:          { type: string, enum: [pending, in_progress, completed, delayed, approved, rejected, awaiting_hod_approval, closed] }
+        approverId:      { type: integer }
+        approvalRemarks: { type: string }
 
     TaskComment:
       type: object

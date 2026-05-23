@@ -22,16 +22,31 @@ import {
 const router = Router();
 
 async function enrichTask(task: typeof tasksTable.$inferSelect) {
-  const [assignee] = await db.select({ name: employeesTable.name }).from(employeesTable).where(eq(employeesTable.id, task.assignedToId));
-  const [creator] = await db.select({ name: employeesTable.name }).from(employeesTable).where(eq(employeesTable.id, task.createdById));
+  const emps = await db.select({ id: employeesTable.id, name: employeesTable.name, designation: employeesTable.designation })
+    .from(employeesTable);
+  const empMap = new Map(emps.map((e) => [e.id, e]));
+
   const [dept] = await db.select({ name: departmentsTable.name }).from(departmentsTable).where(eq(departmentsTable.id, task.departmentId));
+
+  const creator = empMap.get(task.createdById);
+  const approvedBy = task.approvedById ? empMap.get(task.approvedById) : null;
+  const closedBy = task.closedById ? empMap.get(task.closedById) : null;
+
   return {
     ...task,
-    assignedToName: assignee?.name ?? "",
+    assignedToName: empMap.get(task.assignedToId)?.name ?? "",
     createdByName: creator?.name ?? "",
+    createdByDesignation: creator?.designation ?? null,
     departmentName: dept?.name ?? "",
     requestedStatus: task.requestedStatus ?? null,
     completedAt: task.completedAt?.toISOString() ?? null,
+    approvedById: task.approvedById ?? null,
+    approvedByName: approvedBy?.name ?? null,
+    approvedAt: task.approvedAt?.toISOString() ?? null,
+    approvalRemarks: task.approvalRemarks ?? null,
+    closedById: task.closedById ?? null,
+    closedByName: closedBy?.name ?? null,
+    closedAt: task.closedAt?.toISOString() ?? null,
     createdAt: task.createdAt.toISOString(),
   };
 }
@@ -54,13 +69,24 @@ router.get("/tasks", async (req, res) => {
   const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
   const deptMap = new Map(depts.map((d) => [d.id, d.name]));
 
+  const empFull = await db.select({ id: employeesTable.id, name: employeesTable.name, designation: employeesTable.designation }).from(employeesTable);
+  const empFullMap = new Map(empFull.map((e) => [e.id, e]));
+
   res.json(tasks.map((t) => ({
     ...t,
     assignedToName: empMap.get(t.assignedToId) ?? "",
     createdByName: empMap.get(t.createdById) ?? "",
+    createdByDesignation: empFullMap.get(t.createdById)?.designation ?? null,
     departmentName: deptMap.get(t.departmentId) ?? "",
     requestedStatus: t.requestedStatus ?? null,
     completedAt: t.completedAt?.toISOString() ?? null,
+    approvedById: t.approvedById ?? null,
+    approvedByName: t.approvedById ? (empMap.get(t.approvedById) ?? null) : null,
+    approvedAt: t.approvedAt?.toISOString() ?? null,
+    approvalRemarks: t.approvalRemarks ?? null,
+    closedById: t.closedById ?? null,
+    closedByName: t.closedById ? (empMap.get(t.closedById) ?? null) : null,
+    closedAt: t.closedAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
   })));
 });
@@ -120,30 +146,32 @@ router.delete("/tasks/:id", async (req, res) => {
 
 router.patch("/tasks/:id/status", async (req, res) => {
   const { id } = UpdateTaskStatusParams.parse({ id: Number(req.params.id) });
-  const { status } = UpdateTaskStatusBody.parse(req.body);
-  const completedAt = status === "completed" ? new Date() : null;
-  const [task] = await db.update(tasksTable)
-    .set({ status, requestedStatus: null, ...(completedAt !== undefined ? { completedAt } : {}) })
-    .where(eq(tasksTable.id, id))
-    .returning();
+  const { status, approverId, approvalRemarks } = UpdateTaskStatusBody.parse(req.body);
+
+  const updateData: Record<string, unknown> = { status, requestedStatus: null };
+
+  if (status === "completed") updateData.completedAt = new Date();
+  if (status === "approved") {
+    if (approverId) updateData.approvedById = approverId;
+    updateData.approvedAt = new Date();
+    if (approvalRemarks !== undefined) updateData.approvalRemarks = approvalRemarks;
+  }
+  if (status === "closed") {
+    if (approverId) updateData.closedById = approverId;
+    updateData.closedAt = new Date();
+  }
+
+  const [task] = await db.update(tasksTable).set(updateData).where(eq(tasksTable.id, id)).returning();
   if (!task) { res.status(404).json({ error: "Not found" }); return; }
 
-  if (status === "completed") {
-    await db.insert(activityLogTable).values({
-      type: "task_completed",
-      description: `Task "${task.title}" completed`,
-      actorId: task.assignedToId,
-      entityId: task.id,
-      entityType: "task",
-    });
-  } else if (status === "delayed") {
-    await db.insert(activityLogTable).values({
-      type: "task_delayed",
-      description: `Task "${task.title}" marked as delayed`,
-      entityId: task.id,
-      entityType: "task",
-    });
-  }
+  const logType = status === "completed" ? "task_completed" : status === "approved" ? "task_status_approved" : status === "delayed" ? "task_delayed" : "task_status_changed";
+  await db.insert(activityLogTable).values({
+    type: logType,
+    description: `Task "${task.title}" status changed to ${status}`,
+    actorId: approverId ?? task.assignedToId,
+    entityId: task.id,
+    entityType: "task",
+  });
 
   res.json(await enrichTask(task));
 });
