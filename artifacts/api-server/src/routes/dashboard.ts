@@ -235,6 +235,9 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
   const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
   const deptMap = new Map(depts.map((d) => [d.id, d.name]));
 
+  // KRAs pending HR approval — visible to HR department users
+  const allPendingHrKras = await db.select().from(krasTable).where(eq(krasTable.hrApprovalStatus, "pending_hr"));
+
   res.json({
     kras: pendingKras.map((k) => ({
       id: k.id,
@@ -255,6 +258,15 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
       status: t.status,
       requestedStatus: t.requestedStatus!,
       progressPct: t.progressPct,
+    })),
+    krasPendingHrApproval: allPendingHrKras.map((k) => ({
+      id: k.id,
+      title: k.title,
+      description: k.description ?? null,
+      weightage: k.weightage,
+      departmentName: deptMap.get(k.departmentId) ?? "",
+      reviewPeriod: k.reviewPeriod,
+      createdAt: k.createdAt.toISOString(),
     })),
   });
 });

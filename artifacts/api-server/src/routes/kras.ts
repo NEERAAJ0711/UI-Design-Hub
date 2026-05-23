@@ -13,6 +13,7 @@ import {
   SubmitKraForClosureParams,
   ApproveKraClosureParams,
   ApproveKraClosureBody,
+  HrApproveKraParams,
 } from "@workspace/api-zod";
 
 const router = Router();
@@ -59,7 +60,19 @@ router.get("/kras", async (req, res) => {
 
 router.post("/kras", async (req, res) => {
   const body = CreateKraBody.parse(req.body);
-  const [kra] = await db.insert(krasTable).values(body).returning();
+  // New KRAs always start pending HR approval; employeeId cannot be set yet
+  const [kra] = await db.insert(krasTable).values({
+    ...body,
+    employeeId: undefined,
+    hrApprovalStatus: "pending_hr",
+    kraStatus: "active",
+  }).returning();
+  await db.insert(activityLogTable).values({
+    type: "kra_submitted",
+    description: `KRA "${kra.title}" created and pending HR approval`,
+    entityId: kra.id,
+    entityType: "kra",
+  });
   res.status(201).json(await enrichKra(kra));
 });
 
@@ -73,6 +86,17 @@ router.get("/kras/:id", async (req, res) => {
 router.patch("/kras/:id", async (req, res) => {
   const { id } = UpdateKraParams.parse({ id: Number(req.params.id) });
   const body = UpdateKraBody.parse(req.body);
+
+  // Block employee assignment unless HR has approved this KRA
+  if ((body as Record<string, unknown>).employeeId !== undefined) {
+    const [existing] = await db.select().from(krasTable).where(eq(krasTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    if (existing.hrApprovalStatus !== "hr_approved") {
+      res.status(403).json({ error: "KRA must be approved by HR before assigning to an employee." });
+      return;
+    }
+  }
+
   const [kra] = await db.update(krasTable).set(body).where(eq(krasTable.id, id)).returning();
   if (!kra) { res.status(404).json({ error: "Not found" }); return; }
   res.json(await enrichKra(kra));
@@ -95,6 +119,29 @@ router.patch("/kras/:id/score", async (req, res) => {
     entityId: kra.id,
     entityType: "kra",
   });
+  res.json(await enrichKra(kra));
+});
+
+router.patch("/kras/:id/hr-approve", async (req, res) => {
+  const { id } = HrApproveKraParams.parse({ id: Number(req.params.id) });
+  const { approved } = req.body as { approved: boolean };
+
+  const [existing] = await db.select().from(krasTable).where(eq(krasTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+  const newStatus = approved ? "hr_approved" : "hr_rejected";
+  const [kra] = await db.update(krasTable)
+    .set({ hrApprovalStatus: newStatus })
+    .where(eq(krasTable.id, id))
+    .returning();
+
+  await db.insert(activityLogTable).values({
+    type: approved ? "kra_approved" : "kra_rejected",
+    description: `KRA "${kra.title}" ${approved ? "approved by HR" : "rejected by HR"}`,
+    entityId: kra.id,
+    entityType: "kra",
+  });
+
   res.json(await enrichKra(kra));
 });
 

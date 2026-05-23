@@ -9,6 +9,7 @@ import {
   useScoreKra,
   useSubmitKraForClosure,
   useApproveKraClosure,
+  useHrApproveKra,
   useGetPendingApprovals,
   getListKrasQueryKey,
   getGetPendingApprovalsQueryKey,
@@ -43,6 +44,18 @@ const kraStatusColors: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
 };
 
+const hrStatusColors: Record<string, string> = {
+  pending_hr: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  hr_approved: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
+  hr_rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+};
+
+const hrStatusLabel: Record<string, string> = {
+  pending_hr: "Pending HR",
+  hr_approved: "HR Approved",
+  hr_rejected: "HR Rejected",
+};
+
 const kraSchema = z.object({
   title: z.string().min(1, "Title required"),
   description: z.string().optional(),
@@ -59,7 +72,7 @@ type ScoreForm = z.infer<typeof scoreSchema>;
 type KraRow = {
   id: number; title: string; description?: string | null; weightage: number; achievementPct?: number | null;
   departmentId: number; departmentName?: string | null; employeeId?: number | null; employeeName?: string | null; reviewPeriod?: string | null;
-  kraStatus: string; submittedAt?: string | null; closedAt?: string | null;
+  kraStatus: string; hrApprovalStatus?: string | null; submittedAt?: string | null; closedAt?: string | null;
 };
 
 export default function KRAs() {
@@ -207,11 +220,14 @@ function FullKras() {
   const { data: departments } = useListDepartments();
   const { data: employees } = useListEmployees();
 
+  const isHR = !!(user?.departmentName?.toLowerCase().includes("hr"));
+
   const createKra = useCreateKra();
   const updateKra = useUpdateKra();
   const deleteKra = useDeleteKra();
   const scoreKra = useScoreKra();
   const approveKra = useApproveKraClosure();
+  const hrApproveKraMutation = useHrApproveKra();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<KraRow | null>(null);
@@ -229,6 +245,7 @@ function FullKras() {
   const deptEmployees = employees?.filter((e) => selectedDeptId ? e.departmentId === selectedDeptId : true);
 
   const pendingKraApprovals = pendingData?.kras ?? [];
+  const krasPendingHrApproval = pendingData?.krasPendingHrApproval ?? [];
 
   function openCreate() {
     setEditTarget(null);
@@ -289,6 +306,16 @@ function FullKras() {
     });
   }
 
+  function handleHrApproval(id: number, approved: boolean) {
+    hrApproveKraMutation.mutate({ id, data: { approved } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListKrasQueryKey(deptFilter) });
+        queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
+        toast({ title: approved ? "KRA approved by HR — can now be assigned to an employee." : "KRA rejected by HR." });
+      },
+    });
+  }
+
   const filtered = kras?.filter((k) => filterDept === "all" || k.departmentId === Number(filterDept));
 
   return (
@@ -298,10 +325,49 @@ function FullKras() {
           <h2 className="text-3xl font-bold tracking-tight">Key Result Areas (KRAs)</h2>
           <p className="text-muted-foreground">Define responsibilities and measure achievement progress.</p>
         </div>
-        <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Add KRA</Button>
+        {user?.role === "hod" && (
+          <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Add KRA</Button>
+        )}
       </div>
 
-      {/* Pending KRA Approvals */}
+      {/* HR Pending KRA Approvals */}
+      {isHR && krasPendingHrApproval.length > 0 && (
+        <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4 text-purple-500" /> {krasPendingHrApproval.length} KRA{krasPendingHrApproval.length > 1 ? "s" : ""} Awaiting HR Approval
+            </CardTitle>
+            <CardDescription className="text-xs">
+              New KRAs created by department HODs require HR approval before they can be assigned to employees.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {krasPendingHrApproval.map((kra) => (
+                <div key={kra.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-card">
+                  <div>
+                    <p className="text-sm font-medium">{kra.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-muted-foreground">{kra.departmentName} · {kra.reviewPeriod} · {kra.weightage}% weight</p>
+                    </div>
+                    {kra.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[340px]">{kra.description}</p>}
+                  </div>
+                  <div className="flex gap-2 ml-3 shrink-0">
+                    <Button size="sm" variant="outline" className="text-green-600 border-green-200 h-7 px-2" onClick={() => handleHrApproval(kra.id, true)}>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600 border-red-200 h-7 px-2" onClick={() => handleHrApproval(kra.id, false)}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending KRA Closure Approvals */}
       {pendingKraApprovals.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/10">
           <CardHeader className="pb-3">
@@ -385,7 +451,12 @@ function FullKras() {
                       </div>
                     </TableCell>
                     <TableCell>{kra.departmentName}</TableCell>
-                    <TableCell>{kra.employeeName || <span className="text-muted-foreground text-sm">Dept-wide</span>}</TableCell>
+                    <TableCell>
+                      {kra.hrApprovalStatus === "hr_approved"
+                        ? (kra.employeeName || <span className="text-muted-foreground text-sm">Dept-wide</span>)
+                        : <span className="text-muted-foreground text-sm italic">Unassigned</span>
+                      }
+                    </TableCell>
                     <TableCell className="capitalize">{kra.reviewPeriod}</TableCell>
                     <TableCell>{kra.weightage}%</TableCell>
                     <TableCell>
@@ -395,9 +466,16 @@ function FullKras() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${kraStatusColors[kra.kraStatus] ?? ""}`}>
-                        {kra.kraStatus.replace("_", " ")}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${kraStatusColors[kra.kraStatus] ?? ""}`}>
+                          {kra.kraStatus.replace(/_/g, " ")}
+                        </span>
+                        {kra.hrApprovalStatus && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${hrStatusColors[kra.hrApprovalStatus] ?? ""}`}>
+                            {hrStatusLabel[kra.hrApprovalStatus] ?? kra.hrApprovalStatus}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -469,21 +547,32 @@ function FullKras() {
                     </Select><FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="employeeId" render={({ field }) => (
-                  <FormItem><FormLabel>Assign to Employee</FormLabel>
-                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v === "dept-wide" ? undefined : Number(v))}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={selectedDeptId ? "Dept-wide" : "Select a department first"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="dept-wide">Dept-wide</SelectItem>
-                        {deptEmployees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select><FormMessage />
+                {editTarget && editTarget.hrApprovalStatus !== "hr_approved" ? (
+                  <FormItem>
+                    <FormLabel>Assign to Employee</FormLabel>
+                    <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${hrStatusColors[editTarget.hrApprovalStatus ?? "pending_hr"]} opacity-80`}>
+                      {editTarget.hrApprovalStatus === "hr_rejected"
+                        ? "Assignment blocked — HR rejected this KRA."
+                        : "Assignment locked — awaiting HR approval."}
+                    </div>
                   </FormItem>
-                )} />
+                ) : (
+                  <FormField control={form.control} name="employeeId" render={({ field }) => (
+                    <FormItem><FormLabel>Assign to Employee</FormLabel>
+                      <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v === "dept-wide" ? undefined : Number(v))}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={selectedDeptId ? "Dept-wide" : "Select a department first"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="dept-wide">Dept-wide</SelectItem>
+                          {deptEmployees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select><FormMessage />
+                    </FormItem>
+                  )} />
+                )}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

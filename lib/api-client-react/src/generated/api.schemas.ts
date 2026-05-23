@@ -195,6 +195,15 @@ export const KraKraStatus = {
   rejected: 'rejected',
 } as const;
 
+export type KraHrApprovalStatus = typeof KraHrApprovalStatus[keyof typeof KraHrApprovalStatus];
+
+
+export const KraHrApprovalStatus = {
+  pending_hr: 'pending_hr',
+  hr_approved: 'hr_approved',
+  hr_rejected: 'hr_rejected',
+} as const;
+
 export interface Kra {
   id: number;
   title: string;
@@ -211,6 +220,7 @@ export interface Kra {
   employeeName?: string | null;
   reviewPeriod?: KraReviewPeriod;
   kraStatus: KraKraStatus;
+  hrApprovalStatus?: KraHrApprovalStatus;
   /** @nullable */
   submittedAt?: string | null;
   /** @nullable */
@@ -252,6 +262,11 @@ export interface KraUpdate {
   weightage?: number;
   achievementPct?: number;
   reviewPeriod?: KraUpdateReviewPeriod;
+  employeeId?: number;
+}
+
+export interface HrApproveKraInput {
+  approved: boolean;
 }
 
 export interface KraScoreInput {
@@ -578,9 +593,21 @@ export interface PendingTaskApproval {
   progressPct?: number;
 }
 
+export interface HrPendingKraApproval {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  weightage?: number;
+  departmentName: string;
+  reviewPeriod?: string;
+  createdAt: string;
+}
+
 export interface PendingApprovals {
   kras: PendingKraApproval[];
   tasks: PendingTaskApproval[];
+  krasPendingHrApproval: HrPendingKraApproval[];
 }
 
 export type Logout200 = {

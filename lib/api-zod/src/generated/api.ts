@@ -380,6 +380,7 @@ export const ListKrasResponseItem = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -422,6 +423,7 @@ export const GetKraResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -440,7 +442,8 @@ export const UpdateKraBody = zod.object({
   "description": zod.string().optional(),
   "weightage": zod.number().optional(),
   "achievementPct": zod.number().optional(),
-  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional()
+  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "employeeId": zod.number().optional()
 })
 
 export const UpdateKraResponse = zod.object({
@@ -455,6 +458,7 @@ export const UpdateKraResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -492,6 +496,7 @@ export const ScoreKraResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -517,6 +522,37 @@ export const SubmitKraForClosureResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
+  "submittedAt": zod.string().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary HR department approves or rejects a new KRA
+ */
+export const HrApproveKraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const HrApproveKraBody = zod.object({
+  "approved": zod.boolean()
+})
+
+export const HrApproveKraResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "weightage": zod.number(),
+  "achievementPct": zod.number().nullish(),
+  "departmentId": zod.number(),
+  "departmentName": zod.string().optional(),
+  "employeeId": zod.number().nullish(),
+  "employeeName": zod.string().nullish(),
+  "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -547,6 +583,7 @@ export const ApproveKraClosureResponse = zod.object({
   "employeeName": zod.string().nullish(),
   "reviewPeriod": zod.enum(['monthly', 'quarterly', 'yearly']).optional(),
   "kraStatus": zod.enum(['active', 'submitted', 'manager_approved', 'approved', 'rejected']),
+  "hrApprovalStatus": zod.enum(['pending_hr', 'hr_approved', 'hr_rejected']).optional(),
   "submittedAt": zod.string().nullish(),
   "closedAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -1092,6 +1129,15 @@ export const GetPendingApprovalsResponse = zod.object({
   "status": zod.string(),
   "requestedStatus": zod.string(),
   "progressPct": zod.number().optional()
+})),
+  "krasPendingHrApproval": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "weightage": zod.number().optional(),
+  "departmentName": zod.string(),
+  "reviewPeriod": zod.string().optional(),
+  "createdAt": zod.string()
 }))
 })
 

@@ -43,6 +43,7 @@ import type {
   GetRecentActivityParams,
   GetTopPerformersParams,
   HealthStatus,
+  HrApproveKraInput,
   Kpi,
   KpiInput,
   KpiUpdate,
@@ -2210,6 +2211,78 @@ export const useSubmitKraForClosure = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSubmitKraForClosureMutationOptions(options));
+    }
+
+export const getHrApproveKraUrl = (id: number,) => {
+
+
+
+
+  return `/api/kras/${id}/hr-approve`
+}
+
+/**
+ * @summary HR department approves or rejects a new KRA
+ */
+export const hrApproveKra = async (id: number,
+    hrApproveKraInput: HrApproveKraInput, options?: RequestInit): Promise<Kra> => {
+
+  return customFetch<Kra>(getHrApproveKraUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      hrApproveKraInput,)
+  }
+);}
+
+
+
+
+export const getHrApproveKraMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof hrApproveKra>>, TError,{id: number;data: BodyType<HrApproveKraInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof hrApproveKra>>, TError,{id: number;data: BodyType<HrApproveKraInput>}, TContext> => {
+
+const mutationKey = ['hrApproveKra'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof hrApproveKra>>, {id: number;data: BodyType<HrApproveKraInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  hrApproveKra(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HrApproveKraMutationResult = NonNullable<Awaited<ReturnType<typeof hrApproveKra>>>
+    export type HrApproveKraMutationBody = BodyType<HrApproveKraInput>
+    export type HrApproveKraMutationError = ErrorType<unknown>
+
+    /**
+ * @summary HR department approves or rejects a new KRA
+ */
+export const useHrApproveKra = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof hrApproveKra>>, TError,{id: number;data: BodyType<HrApproveKraInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof hrApproveKra>>,
+        TError,
+        {id: number;data: BodyType<HrApproveKraInput>},
+        TContext
+      > => {
+      return useMutation(getHrApproveKraMutationOptions(options));
     }
 
 export const getApproveKraClosureUrl = (id: number,) => {

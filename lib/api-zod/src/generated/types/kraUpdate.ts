@@ -13,4 +13,5 @@ export interface KraUpdate {
   weightage?: number;
   achievementPct?: number;
   reviewPeriod?: KraUpdateReviewPeriod;
+  employeeId?: number;
 }

@@ -5,10 +5,12 @@
  * KRA, KPI & Task Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { HrPendingKraApproval } from './hrPendingKraApproval';
 import type { PendingKraApproval } from './pendingKraApproval';
 import type { PendingTaskApproval } from './pendingTaskApproval';
 
 export interface PendingApprovals {
   kras: PendingKraApproval[];
   tasks: PendingTaskApproval[];
+  krasPendingHrApproval: HrPendingKraApproval[];
 }
