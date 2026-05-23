@@ -502,6 +502,7 @@ function FullTasks() {
             <TableHeader>
               <TableRow>
                 <TableHead>Task</TableHead>
+                <TableHead>My Role</TableHead>
                 <TableHead>Assignee</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>
@@ -514,11 +515,15 @@ function FullTasks() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {[250, 120, 80, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                    {[250, 90, 120, 80, 80, 120, 100, 50].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                   </TableRow>
                 ))
               ) : filtered?.length ? (
-                filtered.map((task) => (
+                filtered.map((task) => {
+                  const isCreator = task.createdById === user?.id;
+                  const isAssignee = task.assignedToId === user?.id;
+                  const myRole = isCreator && isAssignee ? "both" : isCreator ? "creator" : isAssignee ? "assignee" : null;
+                  return (
                   <TableRow key={task.id} className="cursor-pointer" onClick={() => setDetailId(task.id)}>
                     <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                       <div>
@@ -533,6 +538,16 @@ function FullTasks() {
                           </span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {myRole === "both"
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">Assignee &amp; Creator</span>
+                        : myRole === "creator"
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Creator</span>
+                          : myRole === "assignee"
+                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Assignee</span>
+                            : <span className="text-xs text-muted-foreground">—</span>
+                      }
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{task.assignedToName}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -580,10 +595,11 @@ function FullTasks() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No tasks found.</TableCell>
                 </TableRow>
               )}
             </TableBody>

@@ -12,7 +12,7 @@ const DEMO_ACCOUNTS = [
   { role: "HOD (HR)", email: "priya.sharma@company.com", label: "Priya Sharma", isAdmin: false },
   { role: "HOD (IT)", email: "anil.kumar@company.com", label: "Anil Kumar", isAdmin: false },
   { role: "Manager", email: "sunita.verma@company.com", label: "Sunita Verma", isAdmin: false },
-  { role: "Employee", email: "rekha.iyer@company.com", label: "Rekha Iyer", isAdmin: false },
+  { role: "Employee", email: "kavita.joshi@company.com", label: "Kavita Joshi", isAdmin: false },
 ];
 
 export default function Login() {
