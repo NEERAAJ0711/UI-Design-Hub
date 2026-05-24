@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import {
   useListTasks,
   useListEmployees,
@@ -9,13 +10,9 @@ import {
   useUpdateTaskStatus,
   useRequestTaskStatus,
   useApproveTaskStatus,
-  useGetTask,
-  useListTaskComments,
-  useAddTaskComment,
   useGetPendingApprovals,
   getListTasksQueryKey,
   getGetTaskQueryKey,
-  getListTaskCommentsQueryKey,
   getGetPendingApprovalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,7 +21,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -78,8 +74,6 @@ const taskSchema = z.object({
 });
 type TaskFormData = z.infer<typeof taskSchema>;
 
-const commentSchema = z.object({ authorId: z.number({ required_error: "Author required" }), content: z.string().min(1) });
-type CommentForm = z.infer<typeof commentSchema>;
 
 type TaskRow = {
   id: number; title: string; description?: string | null; status: string; requestedStatus?: string | null; priority: string; dueDate?: string | null;
@@ -98,6 +92,7 @@ function EmployeeTasks() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const assignedParams = { assignedToId: user!.id };
   const createdParams = { createdById: user!.id };
@@ -128,7 +123,6 @@ function EmployeeTasks() {
     return [...map.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   })();
 
-  const { data: employees } = useListEmployees();
   const requestStatus = useRequestTaskStatus();
   const updateStatus = useUpdateTaskStatus();
 
@@ -144,7 +138,6 @@ function EmployeeTasks() {
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRole, setFilterRole] = useState<"all" | "assignee" | "creator">("all");
-  const [detailId, setDetailId] = useState<number | null>(null);
   const [requestStatusDialog, setRequestStatusDialog] = useState<{ id: number; title: string } | null>(null);
   const [requestedNewStatus, setRequestedNewStatus] = useState<string>("in_progress");
   const [progressInput, setProgressInput] = useState(0);
@@ -220,12 +213,12 @@ function EmployeeTasks() {
                 ))
               ) : filtered?.length ? (
                 filtered.map((task) => (
-                  <TableRow key={task.id} className="cursor-pointer" onClick={() => setDetailId(task.id)}>
+                  <TableRow key={task.id} className="cursor-pointer" onClick={() => navigate(`/tasks/${task.id}`)}>
                     <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                       <div>
                         <div className="flex items-center gap-1.5">
                           {task.isRecurring && <Repeat className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                          <button className="text-left hover:underline font-medium" onClick={() => setDetailId(task.id)}>{task.title}</button>
+                          <button className="text-left hover:underline font-medium" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}</button>
                         </div>
                         <div className="text-xs text-muted-foreground">{task.departmentName}</div>
                         {task.requestedStatus && (
@@ -269,8 +262,8 @@ function EmployeeTasks() {
                           <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setDetailId(task.id)}>
-                            <MessageSquare className="mr-2 h-4 w-4" /> View & Comments
+                          <DropdownMenuItem onClick={() => navigate(`/tasks/${task.id}`)}>
+                            <MessageSquare className="mr-2 h-4 w-4" /> View Details
                           </DropdownMenuItem>
                           {task.myRole !== "creator" && !task.requestedStatus && (
                             <>
@@ -294,10 +287,6 @@ function EmployeeTasks() {
           </Table>
         </CardContent>
       </Card>
-
-      {detailId && (
-        <TaskDetailSheet taskId={detailId} employees={employees ?? []} onClose={() => setDetailId(null)} onStatusChange={changeStatus} />
-      )}
 
       <Dialog open={!!requestStatusDialog} onOpenChange={(open) => !open && setRequestStatusDialog(null)}>
         <DialogContent className="max-w-sm">
@@ -360,10 +349,10 @@ function FullTasks() {
   const updateStatus = useUpdateTaskStatus();
   const approveStatus = useApproveTaskStatus();
 
+  const [, navigate] = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<TaskRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskRow | null>(null);
-  const [detailId, setDetailId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterDept, setFilterDept] = useState("all");
@@ -429,7 +418,7 @@ function FullTasks() {
       onSuccess: () => {
         invalidateAllTaskQueries();
         queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
-        if (detailId === taskId) queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
+        queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
         toast({ title: `Status updated to ${status.replace(/_/g, " ")}` });
       },
     });
@@ -605,12 +594,12 @@ function FullTasks() {
                   const isAssignee = task.assignedToId === user?.id;
                   const myRole = isCreator && isAssignee ? "both" : isCreator ? "creator" : isAssignee ? "assignee" : null;
                   return (
-                  <TableRow key={task.id} className="cursor-pointer" onClick={() => setDetailId(task.id)}>
+                  <TableRow key={task.id} className="cursor-pointer" onClick={() => navigate(`/tasks/${task.id}`)}>
                     <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                       <div>
                         <div className="flex items-center gap-1.5">
                           {task.isRecurring && <Repeat className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                          <button className="text-left hover:underline font-medium" onClick={() => setDetailId(task.id)}>{task.title}</button>
+                          <button className="text-left hover:underline font-medium" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}</button>
                         </div>
                         <div className="text-xs text-muted-foreground">{task.departmentName}</div>
                         {task.requestedStatus && (
@@ -656,8 +645,8 @@ function FullTasks() {
                           <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setDetailId(task.id)}>
-                            <MessageSquare className="mr-2 h-4 w-4" /> View & Comments
+                          <DropdownMenuItem onClick={() => navigate(`/tasks/${task.id}`)}>
+                            <MessageSquare className="mr-2 h-4 w-4" /> View Details
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {STATUSES.filter((s) => s !== task.status).slice(0, 3).map((s) => (
@@ -687,10 +676,6 @@ function FullTasks() {
           </Table>
         </CardContent>
       </Card>
-
-      {detailId && (
-        <TaskDetailSheet taskId={detailId} employees={employees ?? []} onClose={() => setDetailId(null)} onStatusChange={changeStatus} />
-      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -784,446 +769,5 @@ function FullTasks() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-// ── Task Detail Modal — 4-Step Workflow ───────────────────────────────────────
-function TaskDetailSheet({
-  taskId, employees, onClose, onStatusChange,
-}: {
-  taskId: number;
-  employees: { id: number; name: string }[];
-  onClose: () => void;
-  onStatusChange: (id: number, status: string, opts?: { approverId?: number; approvalRemarks?: string }) => void;
-}) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { data: task, isLoading } = useGetTask(taskId, { query: { queryKey: getGetTaskQueryKey(taskId) } });
-  const { data: comments } = useListTaskComments(taskId, { query: { queryKey: getListTaskCommentsQueryKey(taskId) } });
-  const addComment = useAddTaskComment();
-  const [remarksInput, setRemarksInput] = useState("");
-
-  const commentForm = useForm<CommentForm>({
-    resolver: zodResolver(commentSchema),
-    defaultValues: { content: "", authorId: user?.id },
-  });
-
-  function submitComment(values: CommentForm) {
-    addComment.mutate({ id: taskId, data: values }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTaskCommentsQueryKey(taskId) });
-        commentForm.reset({ content: "", authorId: user?.id });
-        toast({ title: "Comment added" });
-      },
-    });
-  }
-
-  // ── Step-completion logic ───────────────────────────────────────────────────
-  const step1Done = true;
-  const step2Done = !!task?.approvedByName;
-  const step3Done = step2Done && (
-    task?.status === "completed" || task?.status === "in_progress" ||
-    task?.status === "delayed" || task?.status === "rejected"
-  );
-  const step4Done = !!task?.closedByName;
-
-  const currentStep = !step2Done ? 2 : !step3Done ? 3 : !step4Done ? 4 : 5;
-
-  // ── Role/permission helpers ─────────────────────────────────────────────────
-  const isCreator   = task?.createdById === user?.id;
-  const isAssignee  = task?.assignedToId === user?.id;
-  const isHOD       = user?.role === "hod" || user?.role === "manager" || user?.role === "management" || user?.role === "admin";
-
-  const canApprove        = isHOD && !step2Done;
-  const canUpdateStatus   = step2Done && !step4Done && (isAssignee || isHOD);
-  const canCreatorClose   = step2Done && !step4Done && isCreator;
-
-  const ASSIGNEE_STATUSES = ["in_progress", "completed", "delayed", "rejected"] as const;
-
-  function handleApprove() {
-    onStatusChange(taskId, "approved", { approverId: user?.id, approvalRemarks: remarksInput || undefined });
-    setRemarksInput("");
-  }
-  function handleCreatorClose() {
-    onStatusChange(taskId, "closed", { approverId: user?.id });
-  }
-
-  // ── Step visual helpers ─────────────────────────────────────────────────────
-  function stepCircle(n: number, done: boolean, active: boolean) {
-    if (done) return (
-      <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
-        <CheckCircle2 className="h-4 w-4 text-white" />
-      </div>
-    );
-    if (active) return (
-      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shadow-sm ring-4 ring-blue-100 dark:ring-blue-900/40">
-        <span className="text-xs font-bold text-white">{n}</span>
-      </div>
-    );
-    return (
-      <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center">
-        <span className="text-xs font-semibold text-muted-foreground">{n}</span>
-      </div>
-    );
-  }
-
-  function stepCard(done: boolean, active: boolean, children: React.ReactNode) {
-    const border = done
-      ? "border-l-4 border-l-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20"
-      : active
-        ? "border-l-4 border-l-blue-500 bg-blue-50/40 dark:bg-blue-950/20"
-        : "border-l-4 border-l-border bg-muted/20 opacity-60";
-    return (
-      <div className={`rounded-r-xl rounded-bl-xl border ${border} overflow-hidden`}>
-        {children}
-      </div>
-    );
-  }
-
-  const STEPS = [
-    { n: 1, label: "Task Created", sublabel: "by Creator", done: step1Done, active: false },
-    { n: 2, label: "HOD Approves", sublabel: "Assignee's HOD", done: step2Done, active: currentStep === 2 },
-    { n: 3, label: "Status Updated", sublabel: "by Assignee", done: step3Done, active: currentStep === 3 },
-    { n: 4, label: "Task Closed", sublabel: "Accepted by Creator", done: step4Done, active: currentStep === 4 },
-  ];
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto p-0 gap-0">
-
-        {/* ── Modal Header ── */}
-        <div className="sticky top-0 z-10 bg-background border-b px-6 pt-5 pb-4">
-          <DialogHeader>
-            <div className="flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-lg font-bold leading-tight">
-                  {isLoading ? <Skeleton className="h-5 w-56" /> : task?.title ?? "Task Detail"}
-                </DialogTitle>
-                {task?.description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
-                )}
-              </div>
-              {task && (
-                <span className={`shrink-0 mt-0.5 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize ${statusColors[task.status] ?? ""}`}>
-                  {task.status.replace(/_/g, " ")}
-                </span>
-              )}
-            </div>
-          </DialogHeader>
-
-          {/* ── 4-Step Progress Bar ── */}
-          {!isLoading && task && (
-            <div className="mt-4 flex items-center gap-0">
-              {STEPS.map((s, i) => (
-                <div key={s.n} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex flex-col items-center gap-1 shrink-0">
-                    {stepCircle(s.n, s.done, s.active)}
-                    <div className="text-center">
-                      <p className={`text-[10px] font-semibold leading-tight ${s.done ? "text-emerald-600" : s.active ? "text-blue-600" : "text-muted-foreground"}`}>
-                        {s.label}
-                      </p>
-                      <p className="text-[9px] text-muted-foreground leading-tight">{s.sublabel}</p>
-                    </div>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 mb-5 ${s.done ? "bg-emerald-400" : "bg-border"}`} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div className="p-6 space-y-3">
-            <Skeleton className="h-28 w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
-          </div>
-        ) : task ? (
-          <div className="px-6 pb-6 pt-5 space-y-4">
-
-            {/* ══════════════════════════════════════════════════════════
-                STEP 1 — Task Created By Creator
-            ══════════════════════════════════════════════════════════ */}
-            {stepCard(step1Done, false, (
-              <>
-                <div className="px-4 py-2.5 border-b flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-3 w-3 text-white" />
-                  </div>
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">Step 1 — Task Created by Creator</span>
-                </div>
-                <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Created By</p>
-                    <p className="font-semibold text-sm">{task.createdByName || "—"}</p>
-                    {task.createdByDesignation && <p className="text-xs text-muted-foreground">{task.createdByDesignation}</p>}
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Department</p>
-                    <p className="font-semibold text-sm">{task.departmentName || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Assigned To</p>
-                    <p className="font-semibold text-sm">{task.assignedToName || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Created At</p>
-                    <p className="font-semibold text-sm">{format(new Date(task.createdAt), "dd MMM yyyy, h:mm a")}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Priority</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Due Date</p>
-                    <p className="font-semibold text-sm">{task.dueDate ? format(new Date(task.dueDate), "dd MMM yyyy") : "—"}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Progress</p>
-                    <div className="flex items-center gap-3">
-                      <Progress value={task.progressPct} className="flex-1 h-2" />
-                      <span className="text-sm font-semibold w-9 text-right">{task.progressPct}%</span>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ))}
-
-            {/* ══════════════════════════════════════════════════════════
-                STEP 2 — Approved By Assignee's HOD
-            ══════════════════════════════════════════════════════════ */}
-            {stepCard(step2Done, currentStep === 2, (
-              <>
-                <div className="px-4 py-2.5 border-b flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step2Done ? "bg-emerald-500" : currentStep === 2 ? "bg-blue-600" : "bg-muted border border-border"}`}>
-                    {step2Done
-                      ? <CheckCircle2 className="h-3 w-3 text-white" />
-                      : <span className="text-[10px] font-bold text-white">2</span>}
-                  </div>
-                  <span className={`text-xs font-bold uppercase tracking-wide ${step2Done ? "text-emerald-700 dark:text-emerald-400" : currentStep === 2 ? "text-blue-700 dark:text-blue-400" : "text-muted-foreground"}`}>
-                    Step 2 — Approved by Assignee&apos;s HOD
-                  </span>
-                  {!step2Done && currentStep === 2 && (
-                    <span className="ml-auto text-[10px] font-semibold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">Pending</span>
-                  )}
-                </div>
-                <div className="p-4 text-sm space-y-3">
-                  {step2Done ? (
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Approved By</p>
-                        <p className="font-semibold">{task.approvedByName}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Approved At</p>
-                        <p className="font-semibold">{task.approvedAt ? format(new Date(task.approvedAt), "dd MMM yyyy, h:mm a") : "—"}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Remarks</p>
-                        <p className={task.approvalRemarks ? "font-medium" : "text-muted-foreground italic text-xs"}>
-                          {task.approvalRemarks || "No remarks provided"}
-                        </p>
-                      </div>
-                    </div>
-                  ) : canApprove ? (
-                    <div className="space-y-3">
-                      <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">You can approve this task as HOD/Manager.</p>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">Approval Remarks (optional)</label>
-                        <Textarea
-                          placeholder="Add remarks before approving..."
-                          rows={2}
-                          className="text-sm resize-none"
-                          value={remarksInput}
-                          onChange={(e) => setRemarksInput(e.target.value)}
-                        />
-                      </div>
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" onClick={handleApprove}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Approve Task
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-4 w-4 shrink-0" />
-                      <p className="text-xs italic">Awaiting approval from the Assignee&apos;s HOD/Manager.</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            ))}
-
-            {/* ══════════════════════════════════════════════════════════
-                STEP 3 — Status Updated By Assignee
-            ══════════════════════════════════════════════════════════ */}
-            {stepCard(step3Done, currentStep === 3, (
-              <>
-                <div className="px-4 py-2.5 border-b flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step3Done ? "bg-emerald-500" : currentStep === 3 ? "bg-blue-600" : "bg-muted border border-border"}`}>
-                    {step3Done
-                      ? <CheckCircle2 className="h-3 w-3 text-white" />
-                      : <span className="text-[10px] font-bold text-white">3</span>}
-                  </div>
-                  <span className={`text-xs font-bold uppercase tracking-wide ${step3Done ? "text-emerald-700 dark:text-emerald-400" : currentStep === 3 ? "text-blue-700 dark:text-blue-400" : "text-muted-foreground"}`}>
-                    Step 3 — Status Updated by Assignee
-                  </span>
-                  {currentStep === 3 && !step3Done && (
-                    <span className="ml-auto text-[10px] font-semibold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">Action Required</span>
-                  )}
-                </div>
-                <div className="p-4 text-sm space-y-3">
-                  {/* Current status pill */}
-                  <div className="flex items-center gap-3">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Current Status</p>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${statusColors[task.status] ?? ""}`}>
-                      {task.status.replace(/_/g, " ")}
-                    </span>
-                  </div>
-
-                  {task.requestedStatus && (
-                    <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/30 rounded-lg px-3 py-2 border border-orange-200 dark:border-orange-900/30">
-                      <Clock className="h-3.5 w-3.5 shrink-0" />
-                      Requested change: <strong className="capitalize">{task.requestedStatus.replace(/_/g, " ")}</strong>
-                    </div>
-                  )}
-
-                  {canUpdateStatus ? (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {isAssignee ? "Update your progress status:" : "Manage assignee status:"}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {ASSIGNEE_STATUSES.map((s) => (
-                          <Button
-                            key={s}
-                            size="sm"
-                            variant={task.status === s ? "default" : "outline"}
-                            className={`capitalize text-xs font-medium ${task.status === s ? "ring-2 ring-offset-1 ring-primary" : ""}`}
-                            onClick={() => onStatusChange(taskId, s)}
-                          >
-                            {s.replace(/_/g, " ")}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : !step2Done ? (
-                    <p className="text-xs text-muted-foreground italic">Available after HOD approval (Step 2).</p>
-                  ) : step4Done ? null : (
-                    <p className="text-xs text-muted-foreground italic">Only the assignee can update the work status.</p>
-                  )}
-                </div>
-              </>
-            ))}
-
-            {/* ══════════════════════════════════════════════════════════
-                STEP 4 — Approved & Closed By Creator
-            ══════════════════════════════════════════════════════════ */}
-            {stepCard(step4Done, currentStep === 4, (
-              <>
-                <div className="px-4 py-2.5 border-b flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step4Done ? "bg-emerald-500" : currentStep === 4 ? "bg-blue-600" : "bg-muted border border-border"}`}>
-                    {step4Done
-                      ? <CheckCircle2 className="h-3 w-3 text-white" />
-                      : <span className="text-[10px] font-bold text-white">4</span>}
-                  </div>
-                  <span className={`text-xs font-bold uppercase tracking-wide ${step4Done ? "text-emerald-700 dark:text-emerald-400" : currentStep === 4 ? "text-blue-700 dark:text-blue-400" : "text-muted-foreground"}`}>
-                    Step 4 — Approved &amp; Closed by Creator
-                  </span>
-                  {currentStep === 4 && !step4Done && isCreator && (
-                    <span className="ml-auto text-[10px] font-semibold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">Your Action</span>
-                  )}
-                </div>
-                <div className="p-4 text-sm">
-                  {step4Done ? (
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Accepted By</p>
-                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">{task.closedByName}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Accepted At</p>
-                        <p className="font-semibold">{task.closedAt ? format(new Date(task.closedAt), "dd MMM yyyy, h:mm a") : "—"}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 px-3 py-1.5 rounded-full">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Task fully completed &amp; accepted
-                        </span>
-                      </div>
-                    </div>
-                  ) : canCreatorClose ? (
-                    <div className="space-y-3">
-                      <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
-                        You created this task. Review the assignee&apos;s update above and close to accept it.
-                      </p>
-                      <Button
-                        size="default"
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-5"
-                        onClick={handleCreatorClose}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-2" /> Accept &amp; Close Task
-                      </Button>
-                      <p className="text-[10px] text-muted-foreground text-center">Closing confirms you accept the work done by the assignee.</p>
-                    </div>
-                  ) : !step3Done ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-4 w-4 shrink-0" />
-                      <p className="text-xs italic">Available after the assignee updates their status (Step 3).</p>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-4 w-4 shrink-0" />
-                      <p className="text-xs italic">Awaiting acceptance from the task creator.</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            ))}
-
-            {/* ── Comments ─────────────────────────────────────────── */}
-            <div className="rounded-xl border bg-muted/20 overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/50 border-b flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Comments</span>
-                <span className="text-xs bg-muted border px-1.5 py-0.5 rounded-full font-medium">{comments?.length ?? 0}</span>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                  {comments?.map((c) => (
-                    <div key={c.id} className="bg-background rounded-lg p-3 text-sm border">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-xs">{c.authorName}</span>
-                        <span className="text-[10px] text-muted-foreground">{format(new Date(c.createdAt), "dd MMM, h:mm a")}</span>
-                      </div>
-                      <p className="text-sm leading-relaxed">{c.content}</p>
-                    </div>
-                  ))}
-                  {!comments?.length && <p className="text-xs text-muted-foreground italic py-2">No comments yet. Be the first to comment.</p>}
-                </div>
-                <Form {...commentForm}>
-                  <form onSubmit={commentForm.handleSubmit(submitComment)} className="flex gap-2 border-t pt-3 items-end">
-                    <FormField control={commentForm.control} name="content" render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Textarea placeholder="Write a comment..." rows={2} className="resize-none text-sm" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <Button type="submit" size="sm" className="shrink-0 mb-0.5" disabled={addComment.isPending}>
-                      <Send className="h-3.5 w-3.5" />
-                    </Button>
-                  </form>
-                </Form>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-8 text-center">
-            <p className="text-sm text-muted-foreground">Task not found.</p>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
