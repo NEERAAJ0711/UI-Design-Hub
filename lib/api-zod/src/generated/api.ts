@@ -390,6 +390,26 @@ export const DeleteEmployeeParams = zod.object({
 
 
 /**
+ * @summary Reset an employee's password (admin only)
+ */
+export const ResetEmployeePasswordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resetEmployeePasswordBodyNewPasswordMin = 6;
+
+
+
+export const ResetEmployeePasswordBody = zod.object({
+  "newPassword": zod.string().min(resetEmployeePasswordBodyNewPasswordMin)
+})
+
+export const ResetEmployeePasswordResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary List KRAs
  */
 export const ListKrasQueryParams = zod.object({

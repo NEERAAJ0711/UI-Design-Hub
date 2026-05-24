@@ -69,6 +69,8 @@ export * from './logout200';
 export * from './pendingApprovals';
 export * from './pendingKraApproval';
 export * from './pendingTaskApproval';
+export * from './resetEmployeePassword200';
+export * from './resetPasswordInput';
 export * from './scoreWeights';
 export * from './scoreWeightsInput';
 export * from './task';

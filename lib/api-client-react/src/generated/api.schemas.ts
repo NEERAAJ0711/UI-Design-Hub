@@ -177,6 +177,11 @@ export interface BulkUploadResult {
   errors: BulkUploadResultErrorsItem[];
 }
 
+export interface ResetPasswordInput {
+  /** @minLength 6 */
+  newPassword: string;
+}
+
 export type EmployeeUpdateRole = typeof EmployeeUpdateRole[keyof typeof EmployeeUpdateRole];
 
 
@@ -766,6 +771,10 @@ role?: string;
 
 export type BulkUploadEmployeesBody = {
   rows: BulkEmployeeRow[];
+};
+
+export type ResetEmployeePassword200 = {
+  ok: boolean;
 };
 
 export type ListKrasParams = {

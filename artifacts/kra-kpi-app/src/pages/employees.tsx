@@ -8,6 +8,7 @@ import {
   useListDesignations,
   useListCompanies,
   useBulkUploadEmployees,
+  useResetEmployeePassword,
   getListEmployeesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus, MoreHorizontal, Pencil, Trash2, Lock,
   Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, ChevronRight,
+  KeyRound, Eye, EyeOff, ShieldAlert,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -116,6 +118,166 @@ function downloadTemplate(deptNames: string[]) {
   const a = document.createElement("a");
   a.href = url; a.download = "employee_bulk_upload_template.csv"; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── ResetPasswordDialog ──────────────────────────────────────────────────────
+
+const resetSchema = z.object({
+  newPassword: z.string().min(6, "Minimum 6 characters"),
+  confirm: z.string().min(1, "Please confirm"),
+}).refine((d) => d.newPassword === d.confirm, { message: "Passwords don't match", path: ["confirm"] });
+type ResetForm = z.infer<typeof resetSchema>;
+
+function ResetPasswordDialog({ emp, open, onClose }: { emp: Employee | null; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const resetPwd = useResetEmployeePassword();
+  const [showPwd, setShowPwd] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const form = useForm<ResetForm>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { newPassword: "", confirm: "" },
+  });
+
+  function fillDefault() {
+    form.setValue("newPassword", "Password@123");
+    form.setValue("confirm", "Password@123");
+  }
+
+  function onSubmit(values: ResetForm) {
+    if (!emp) return;
+    resetPwd.mutate(
+      { id: emp.id, data: { newPassword: values.newPassword } },
+      {
+        onSuccess: () => {
+          toast({ title: `Password reset for ${emp.name}` });
+          form.reset();
+          onClose();
+        },
+        onError: () => toast({ title: "Reset failed", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleClose() {
+    form.reset();
+    onClose();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-amber-500" />
+            Reset Password
+          </DialogTitle>
+          <DialogDescription>
+            Set a new password for <strong>{emp?.name}</strong>.
+            They will need to use it on next login.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Quick default option */}
+        <div className="flex items-center justify-between rounded-lg border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5">
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Quick reset to default</p>
+            <p className="text-xs text-amber-700/70 dark:text-amber-400/70 font-mono mt-0.5">Password@123</p>
+          </div>
+          <Button type="button" variant="outline" size="sm"
+            className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            onClick={fillDefault}>
+            Use Default
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex-1 h-px bg-border" />
+          <span>or set custom password</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+            <FormField control={form.control} name="newPassword" render={({ field }) => (
+              <FormItem>
+                <FormLabel>New Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      type={showPwd ? "text" : "password"}
+                      placeholder="Min. 6 characters"
+                      className="pr-9"
+                      {...field}
+                    />
+                    <button type="button" tabIndex={-1}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPwd((v) => !v)}>
+                      {showPwd ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="confirm" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      type={showConfirm ? "text" : "password"}
+                      placeholder="Re-enter password"
+                      className="pr-9"
+                      {...field}
+                    />
+                    <button type="button" tabIndex={-1}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowConfirm((v) => !v)}>
+                      {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Strength hints */}
+            {form.watch("newPassword").length > 0 && (
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
+                {[
+                  { label: "6+ characters", ok: form.watch("newPassword").length >= 6 },
+                  { label: "Uppercase letter", ok: /[A-Z]/.test(form.watch("newPassword")) },
+                  { label: "Lowercase letter", ok: /[a-z]/.test(form.watch("newPassword")) },
+                  { label: "Number or symbol", ok: /[\d\W]/.test(form.watch("newPassword")) },
+                ].map(({ label, ok }) => (
+                  <li key={label} className={`flex items-center gap-1 ${ok ? "text-green-600" : "text-muted-foreground"}`}>
+                    <CheckCircle2 className={`h-3 w-3 ${ok ? "text-green-500" : "text-muted-foreground/40"}`} />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+              <span>The employee will not be notified automatically. Please inform them of their new password.</span>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button type="submit"
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                disabled={resetPwd.isPending}>
+                {resetPwd.isPending ? "Resetting…" : "Reset Password"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ── BulkUploadDialog ─────────────────────────────────────────────────────────
@@ -469,6 +631,9 @@ export default function Employees() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [resetTarget, setResetTarget] = useState<Employee | null>(null);
+
+  const isAdmin = user?.role === "admin";
   const [filterDept, setFilterDept] = useState<string>("all");
   const [filterRole, setFilterRole] = useState<string>("all");
 
@@ -649,6 +814,12 @@ export default function Employees() {
                             <DropdownMenuItem onClick={() => openEdit(emp as Employee)}>
                               <Pencil className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
+                            {isAdmin && (
+                              <DropdownMenuItem onClick={() => setResetTarget(emp as Employee)}
+                                className="text-amber-600 dark:text-amber-400 focus:text-amber-600 dark:focus:text-amber-400">
+                                <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(emp as Employee)}>
                               <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
@@ -672,6 +843,15 @@ export default function Employees() {
 
       {/* Bulk Upload dialog */}
       {canManage && <BulkUploadDialog open={bulkOpen} onClose={() => setBulkOpen(false)} />}
+
+      {/* Reset Password dialog — admin only */}
+      {isAdmin && (
+        <ResetPasswordDialog
+          emp={resetTarget}
+          open={!!resetTarget}
+          onClose={() => setResetTarget(null)}
+        />
+      )}
 
       {/* Create / Edit dialog */}
       {canManage && (

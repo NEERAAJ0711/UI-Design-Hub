@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 import {
   CreateEmployeeBody,
   UpdateEmployeeBody,
@@ -163,6 +164,44 @@ router.delete("/employees/:id", async (req, res) => {
   const { id } = DeleteEmployeeParams.parse({ id: Number(req.params.id) });
   await db.delete(employeesTable).where(eq(employeesTable.id, id));
   res.status(204).send();
+});
+
+router.post("/employees/:id/reset-password", async (req, res) => {
+  const callerId = (req.session as { userId?: number }).userId;
+  const id = Number(req.params.id);
+
+  if (!callerId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  // Only admin can reset passwords
+  const [caller] = await db.select({ role: employeesTable.role })
+    .from(employeesTable).where(eq(employeesTable.id, callerId)).limit(1);
+  if (!caller || caller.role !== "admin") {
+    res.status(403).json({ error: "Only admins can reset passwords" });
+    return;
+  }
+
+  const { newPassword } = req.body as { newPassword?: string };
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+
+  const [target] = await db.select({ id: employeesTable.id, name: employeesTable.name })
+    .from(employeesTable).where(eq(employeesTable.id, id)).limit(1);
+  if (!target) { res.status(404).json({ error: "Employee not found" }); return; }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(employeesTable).set({ passwordHash }).where(eq(employeesTable.id, id));
+
+  await db.insert(activityLogTable).values({
+    type: "password_reset",
+    description: `Password reset for ${target.name} by admin`,
+    actorId: callerId,
+    entityId: id,
+    entityType: "employee",
+  });
+
+  res.json({ ok: true });
 });
 
 export default router;

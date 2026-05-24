@@ -462,6 +462,38 @@ paths:
         "204":
           description: Deleted
 
+  /employees/{id}/reset-password:
+    post:
+      operationId: resetEmployeePassword
+      tags: [employees]
+      summary: Reset an employee's password (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
   # ── KRAs ──────────────────────────────────────────────────────────────────────
   /kras:
     get:
@@ -1403,6 +1435,12 @@ components:
               email: { type: string }
               name:  { type: string }
               error: { type: string }
+
+    ResetPasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword: { type: string, minLength: 6 }
 
     EmployeeUpdate:
       type: object
