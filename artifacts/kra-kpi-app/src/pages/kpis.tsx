@@ -158,23 +158,14 @@ export default function KPIs() {
 
       {!isEmployee && (
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Employee filter — HOD only sees own dept employees */}
-          <Select value={filterEmp} onValueChange={setFilterEmp}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Employees" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Employees</SelectItem>
-              {visibleEmployees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {/* Dept filter — locked for HOD */}
+          {/* Dept filter — locked for HOD, otherwise free */}
           {forcedDeptId != null ? (
             <div className="flex items-center gap-1.5 rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground select-none">
               <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               {departments?.find((d) => d.id === forcedDeptId)?.name ?? "Your Department"}
             </div>
           ) : (
-            <Select value={filterDept} onValueChange={setFilterDept}>
+            <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterEmp("all"); }}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
@@ -182,6 +173,20 @@ export default function KPIs() {
               </SelectContent>
             </Select>
           )}
+
+          {/* Employee filter — scoped to selected department */}
+          <Select value={filterEmp} onValueChange={setFilterEmp}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Employees" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Employees</SelectItem>
+              {(forcedDeptId != null
+                ? visibleEmployees
+                : filterDept === "all"
+                  ? employees
+                  : employees?.filter((e) => e.departmentId === Number(filterDept))
+              )?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
