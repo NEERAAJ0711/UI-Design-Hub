@@ -89,7 +89,14 @@ router.get("/kpis", async (req, res) => {
 router.post("/kpis", async (req, res) => {
   const body = CreateKpiBody.parse(req.body);
   const totalScore = calcTotalScore(body);
-  const [kpi] = await db.insert(kpisTable).values({ ...body, totalScore }).returning();
+
+  const [kpi] = await db.insert(kpisTable)
+    .values({ ...body, totalScore })
+    .onConflictDoUpdate({
+      target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
+      set: { ...body, totalScore },
+    })
+    .returning();
 
   await db.insert(activityLogTable).values({
     type: "kpi_updated",
@@ -168,14 +175,12 @@ router.post("/kpis/calculate-batch", async (req, res) => {
     ) / (totalWeight || 100);
     const totalScore = Math.round(rawScore * 10) / 10;
 
-    if (existing) {
-      await db.update(kpisTable)
-        .set({ kraAchievement, taskCompletion, totalScore })
-        .where(eq(kpisTable.id, existing.id));
-    } else {
-      await db.insert(kpisTable)
-        .values({ employeeId: emp.id, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore });
-    }
+    await db.insert(kpisTable)
+      .values({ employeeId: emp.id, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+      .onConflictDoUpdate({
+        target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
+        set: { kraAchievement, taskCompletion, totalScore },
+      });
     saved++;
   }
 
@@ -218,17 +223,13 @@ router.post("/kpis/calculate", async (req, res) => {
   ) / (totalWeight || 100);
   const totalScore = Math.round(rawScore * 10) / 10;
 
-  let kpi;
-  if (existing) {
-    [kpi] = await db.update(kpisTable)
-      .set({ kraAchievement, taskCompletion, totalScore })
-      .where(eq(kpisTable.id, existing.id))
-      .returning();
-  } else {
-    [kpi] = await db.insert(kpisTable)
-      .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
-      .returning();
-  }
+  const [kpi] = await db.insert(kpisTable)
+    .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+    .onConflictDoUpdate({
+      target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
+      set: { kraAchievement, taskCompletion, totalScore },
+    })
+    .returning();
 
   await db.insert(activityLogTable).values({
     type: "kpi_updated",

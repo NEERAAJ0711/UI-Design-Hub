@@ -74,18 +74,26 @@ export default function KPIs() {
 
   const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
 
-  // Auto-calculate & save KPI scores for all employees on page load (once per session)
-  // Uses a single batch endpoint instead of 250 parallel requests for fast page load.
+  // Auto-calculate & save KPI scores for all employees once per browser session.
+  // sessionStorage persists across component remounts so navigating away and
+  // back does NOT trigger a second batch run (which previously caused duplicates).
   useEffect(() => {
-    if (isEmployee || hasAutoCalced.current) return;
-    hasAutoCalced.current = true;
+    const SESSION_KEY = "kpi_batch_calced";
     const month = new Date().getMonth() + 1;
     const year = new Date().getFullYear();
+    const sessionToken = `${year}-${month}`;
+
+    if (isEmployee || hasAutoCalced.current) return;
+    if (sessionStorage.getItem(SESSION_KEY) === sessionToken) return;
+
+    hasAutoCalced.current = true;
+    sessionStorage.setItem(SESSION_KEY, sessionToken);
+
     calculateKpiBatchAsync({ data: { month, year } })
       .then(({ saved }) => {
         if (saved > 0) {
           queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
-          toast({ title: `KPI scores auto-calculated for ${saved} employee(s)` });
+          toast({ title: `KPI scores refreshed for ${saved} employee(s)` });
         }
       })
       .catch(() => { /* silent — batch failures are non-critical */ });

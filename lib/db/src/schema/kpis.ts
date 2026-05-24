@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, timestamp, real, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,7 +15,9 @@ export const kpisTable = pgTable("kpis", {
   totalScore: real("total_score").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => ({
+  employeeMonthYearUniq: unique("kpis_employee_month_year_unique").on(table.employeeId, table.month, table.year),
+}));
 
 export const insertKpiSchema = createInsertSchema(kpisTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertKpi = z.infer<typeof insertKpiSchema>;
