@@ -55,7 +55,7 @@ export default function KPIs() {
     : forcedDeptId != null
       ? { departmentId: forcedDeptId }
       : {};
-  const { data: kpis, isLoading } = useListKpis(kpiParams, { query: { queryKey: getListKpisQueryKey(kpiParams) } });
+  const { data: kpis, isLoading } = useListKpis(kpiParams, { query: { queryKey: getListKpisQueryKey(kpiParams), staleTime: 0, refetchOnMount: "always" } });
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
   const { data: scoreWeights } = useGetScoreWeights();
