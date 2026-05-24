@@ -638,6 +638,10 @@ export default function Employees() {
   const [filterRole, setFilterRole] = useState<string>("all");
 
   const isHR = user?.departmentName?.toLowerCase().includes("hr") ?? false;
+  const isHod = user?.role === "hod";
+  const canSeeAll = isAdmin || isHR || user?.role === "management";
+  // HODs who are not in HR/admin/management are locked to their own department
+  const forcedDeptId: number | null = isHod && !canSeeAll ? (user?.departmentId ?? null) : null;
   const canManage = user?.role === "admin" || isHR;
 
   const form = useForm<EmpForm>({
@@ -706,8 +710,11 @@ export default function Employees() {
     });
   }
 
+  // HOD sees only their own dept; everyone else respects the filterDept dropdown
+  const effectiveDeptFilter = forcedDeptId != null ? forcedDeptId.toString() : filterDept;
+
   const filtered = employees?.filter((e) => {
-    if (filterDept !== "all" && e.departmentId !== Number(filterDept)) return false;
+    if (effectiveDeptFilter !== "all" && e.departmentId !== Number(effectiveDeptFilter)) return false;
     if (filterRole !== "all" && e.role !== filterRole) return false;
     return true;
   });
@@ -740,16 +747,24 @@ export default function Employees() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <Select value={filterDept} onValueChange={setFilterDept}>
-          <SelectTrigger className="w-[180px]" data-testid="select-filter-department">
-            <SelectValue placeholder="All Departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-3 items-center">
+        {forcedDeptId != null ? (
+          /* HOD locked badge — cannot change dept */
+          <div className="flex items-center gap-1.5 rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground select-none">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            {departments?.find((d) => d.id === forcedDeptId)?.name ?? "Your Department"}
+          </div>
+        ) : (
+          <Select value={filterDept} onValueChange={setFilterDept}>
+            <SelectTrigger className="w-[180px]" data-testid="select-filter-department">
+              <SelectValue placeholder="All Departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={filterRole} onValueChange={setFilterRole}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="All Roles" />

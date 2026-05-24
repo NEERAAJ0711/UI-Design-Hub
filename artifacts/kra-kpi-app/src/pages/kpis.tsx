@@ -44,8 +44,17 @@ export default function KPIs() {
   const { toast } = useToast();
 
   const isEmployee = user?.role === "employee";
+  const isHR = user?.departmentName?.toLowerCase().includes("hr") ?? false;
+  const isHod = user?.role === "hod";
+  const canSeeAll = user?.role === "admin" || isHR || user?.role === "management";
+  // HODs who are not HR/admin/management are locked to their own department
+  const forcedDeptId: number | null = isHod && !canSeeAll ? (user?.departmentId ?? null) : null;
 
-  const kpiParams = isEmployee ? { employeeId: user!.id } : {};
+  const kpiParams = isEmployee
+    ? { employeeId: user!.id }
+    : forcedDeptId != null
+      ? { departmentId: forcedDeptId }
+      : {};
   const { data: kpis, isLoading } = useListKpis(kpiParams, { query: { queryKey: getListKpisQueryKey(kpiParams) } });
   const { data: employees } = useListEmployees();
   const { data: departments } = useListDepartments();
@@ -56,6 +65,11 @@ export default function KPIs() {
   const [deleteTarget, setDeleteTarget] = useState<KpiRow | null>(null);
   const [filterEmp, setFilterEmp] = useState("all");
   const [filterDept, setFilterDept] = useState("all");
+
+  // Employees visible to this user (HOD = own dept only)
+  const visibleEmployees = forcedDeptId != null
+    ? employees?.filter((e) => e.departmentId === forcedDeptId)
+    : employees;
   const hasAutoCalced = useRef(false);
 
   const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
@@ -135,21 +149,31 @@ export default function KPIs() {
       })()}
 
       {!isEmployee && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Employee filter — HOD only sees own dept employees */}
           <Select value={filterEmp} onValueChange={setFilterEmp}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Employees" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Employees</SelectItem>
-              {employees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
+              {visibleEmployees?.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filterDept} onValueChange={setFilterDept}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+
+          {/* Dept filter — locked for HOD */}
+          {forcedDeptId != null ? (
+            <div className="flex items-center gap-1.5 rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground select-none">
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              {departments?.find((d) => d.id === forcedDeptId)?.name ?? "Your Department"}
+            </div>
+          ) : (
+            <Select value={filterDept} onValueChange={setFilterDept}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 
