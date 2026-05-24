@@ -450,37 +450,55 @@ export function generateKraPerformancePDF(params: {
 }) {
   const { scopeLabel, kras, showEmployeeCol, showDeptCol } = params;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const todayStr = new Date().toISOString().slice(0, 10);
   const period = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   addHeader(doc, "KRA Performance Report", `${scopeLabel} · ${period}`);
 
   let y = 36;
 
-  // ── Summary stat boxes ──
-  const total      = kras.length;
-  const hrApproved = kras.filter((k) => k.hrApprovalStatus === "hr_approved").length;
-  const fullyClosed = kras.filter((k) => k.kraStatus === "approved").length;
-  const scoredKras  = kras.filter((k) => k.achievementPct != null && (k.weightage ?? 0) > 0);
-  const totalWt     = scoredKras.reduce((s, k) => s + (k.weightage ?? 0), 0);
+  // ── Helpers ──
+  const isDelayed    = (k: KraReportRecord) =>
+    !!(k.dueDate && k.dueDate < todayStr && k.kraStatus !== "approved" && k.kraStatus !== "rejected");
+  const isIncomplete = (k: KraReportRecord) =>
+    k.kraStatus !== "approved" && k.kraStatus !== "rejected";
+
+  // ── Summary stat boxes (5 across landscape) ──
+  const total          = kras.length;
+  const delayedCount   = kras.filter(isDelayed).length;
+  const incompleteCount = kras.filter(isIncomplete).length;
+  const fullyClosed    = kras.filter((k) => k.kraStatus === "approved").length;
+  const scoredKras     = kras.filter((k) => k.achievementPct != null && (k.weightage ?? 0) > 0);
+  const totalWt        = scoredKras.reduce((s, k) => s + (k.weightage ?? 0), 0);
   const avgAchievement = totalWt > 0
     ? Math.round((scoredKras.reduce((s, k) => s + (k.achievementPct ?? 0) * (k.weightage ?? 0), 0) / totalWt) * 10) / 10
     : 0;
 
   const pw = doc.internal.pageSize.getWidth() - 28;
-  const bw = (pw - 12) / 4;
-  statBox(doc, 14,           y, bw, "Total KRAs",       String(total),        BRAND_BLUE);
-  statBox(doc, 14+bw+4,      y, bw, "HR Approved",       String(hrApproved),   hrApproved > 0 ? GREEN : MID_GRAY);
-  statBox(doc, 14+(bw+4)*2,  y, bw, "Avg Achievement",   `${avgAchievement}%`, avgAchievement >= 70 ? GREEN : avgAchievement >= 40 ? AMBER : avgAchievement > 0 ? RED : MID_GRAY);
-  statBox(doc, 14+(bw+4)*3,  y, bw, "Fully Closed",      String(fullyClosed),  fullyClosed > 0 ? GREEN : MID_GRAY);
+  const bw = (pw - 16) / 5;
+  statBox(doc, 14,            y, bw, "Total KRAs",     String(total),           BRAND_BLUE);
+  statBox(doc, 14+(bw+4),     y, bw, "Delayed",         String(delayedCount),    delayedCount > 0 ? RED : MID_GRAY);
+  statBox(doc, 14+(bw+4)*2,   y, bw, "Incomplete",      String(incompleteCount), incompleteCount > 0 ? AMBER : MID_GRAY);
+  statBox(doc, 14+(bw+4)*3,   y, bw, "Avg Achievement", `${avgAchievement}%`,    avgAchievement >= 70 ? GREEN : avgAchievement >= 40 ? AMBER : avgAchievement > 0 ? RED : MID_GRAY);
+  statBox(doc, 14+(bw+4)*4,   y, bw, "Fully Closed",    String(fullyClosed),     fullyClosed > 0 ? GREEN : MID_GRAY);
   y += 24;
 
-  // ── Status breakdown ──
+  // ── Status & delay breakdown (side by side) ──
   y = sectionTitle(doc, y, "Status Breakdown");
+
   const statuses = ["active", "submitted", "manager_approved", "approved", "rejected"];
   const statusRows = statuses
     .map((s) => {
       const cnt = kras.filter((k) => k.kraStatus === s).length;
       const pct = total ? Math.round((cnt / total) * 100) : 0;
       return [KRA_STATUS_LABEL[s] ?? s, String(cnt), `${pct}%`];
+    })
+    .filter((r) => r[1] !== "0");
+
+  // Delayed sub-breakdown: how many delayed per status
+  const delayedByStatus = statuses
+    .map((s) => {
+      const cnt = kras.filter((k) => k.kraStatus === s && isDelayed(k)).length;
+      return [KRA_STATUS_LABEL[s] ?? s, String(cnt)];
     })
     .filter((r) => r[1] !== "0");
 
@@ -495,7 +513,6 @@ export function generateKraPerformancePDF(params: {
     tableWidth: 94,
     willDrawCell: (data) => {
       if (data.section === "body" && data.column.index === 0) {
-        const k = String(data.cell.raw ?? "").toLowerCase().replace(/\s+/g, "_");
         const found = Object.entries(KRA_STATUS_LABEL).find(([, v]) => v.toLowerCase() === String(data.cell.raw ?? "").toLowerCase());
         const col = found ? KRA_STATUS_COLOR[found[0]] : undefined;
         if (col) { data.cell.styles.textColor = [...col] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
@@ -503,14 +520,128 @@ export function generateKraPerformancePDF(params: {
     },
     margin: { left: 14, right: 14 },
   });
-  y = (doc as any).lastAutoTable.finalY + 10;
+
+  // Delayed breakdown table — rendered right-side of status table on same row
+  if (delayedByStatus.length > 0) {
+    const afterY = (doc as any).lastAutoTable.finalY;
+    autoTable(doc, {
+      startY: y,
+      head: [["Delayed by Status", "Count"]],
+      body: delayedByStatus,
+      headStyles: { fillColor: [...RED], textColor: 255, fontSize: 8, fontStyle: "bold" },
+      bodyStyles: { fontSize: 8, textColor: [...TEXT_DARK] },
+      alternateRowStyles: { fillColor: [...LIGHT_GRAY] },
+      willDrawCell: (data) => {
+        if (data.section === "body" && data.column.index === 0) {
+          data.cell.styles.textColor = [...RED] as [number, number, number];
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
+      columnStyles: { 0: { cellWidth: 50 }, 1: { halign: "center", cellWidth: 22 } },
+      tableWidth: 72,
+      margin: { left: 116, right: 14 },
+    });
+    y = Math.max(afterY, (doc as any).lastAutoTable.finalY) + 10;
+  } else {
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ── Daily KRAs section ──
+  const dailyKras = kras.filter((k) => k.frequency === "daily");
+  if (dailyKras.length > 0) {
+    if (y > 150) { doc.addPage(); y = 20; }
+    y = sectionTitle(doc, y, `Daily KRAs (${dailyKras.length})`);
+
+    const dailyDelayed    = dailyKras.filter(isDelayed).length;
+    const dailyIncomplete = dailyKras.filter(isIncomplete).length;
+    const dailyClosed     = dailyKras.filter((k) => k.kraStatus === "approved").length;
+    const dailyScored     = dailyKras.filter((k) => k.achievementPct != null && (k.weightage ?? 0) > 0);
+    const dailyWt         = dailyScored.reduce((s, k) => s + (k.weightage ?? 0), 0);
+    const dailyAvg        = dailyWt > 0
+      ? Math.round((dailyScored.reduce((s, k) => s + (k.achievementPct ?? 0) * (k.weightage ?? 0), 0) / dailyWt) * 10) / 10
+      : 0;
+
+    // Summary mini-row
+    autoTable(doc, {
+      startY: y,
+      head: [["Total Daily", "Delayed", "Incomplete", "Avg Achievement", "Fully Closed"]],
+      body: [[dailyKras.length, dailyDelayed, dailyIncomplete, dailyAvg > 0 ? `${dailyAvg}%` : "—", dailyClosed]],
+      headStyles: { fillColor: [...BRAND_BLUE], textColor: 255, fontSize: 8, fontStyle: "bold" },
+      bodyStyles: { fontSize: 8, textColor: [...TEXT_DARK], fontStyle: "bold" },
+      columnStyles: { 0: { halign: "center" }, 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
+      willDrawCell: (data) => {
+        if (data.section === "body") {
+          if (data.column.index === 1 && dailyDelayed > 0) { data.cell.styles.textColor = [...RED] as [number, number, number]; }
+          if (data.column.index === 2 && dailyIncomplete > 0) { data.cell.styles.textColor = [...AMBER] as [number, number, number]; }
+          if (data.column.index === 3) { const c = dailyAvg >= 70 ? GREEN : dailyAvg >= 40 ? AMBER : dailyAvg > 0 ? RED : MID_GRAY; data.cell.styles.textColor = [...c] as [number, number, number]; }
+          if (data.column.index === 4 && dailyClosed > 0) { data.cell.styles.textColor = [...GREEN] as [number, number, number]; }
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // Daily KRA detail list
+    const dHead: string[] = ["KRA Title"];
+    if (showEmployeeCol) dHead.push("Employee");
+    if (showDeptCol) dHead.push("Department");
+    dHead.push("Weightage", "Status", "Achievement", "Due Date", "Overdue?");
+
+    autoTable(doc, {
+      startY: y,
+      head: [dHead],
+      body: dailyKras.map((k) => {
+        const delayed = isDelayed(k);
+        const row: (string | number)[] = [k.title ?? "—"];
+        if (showEmployeeCol) row.push(k.employeeName ?? "Dept-wide");
+        if (showDeptCol) row.push(k.departmentName ?? "—");
+        row.push(
+          `${k.weightage ?? 0}%`,
+          KRA_STATUS_LABEL[k.kraStatus ?? ""] ?? titleCase(k.kraStatus ?? "—"),
+          k.achievementPct != null ? `${k.achievementPct}%` : "—",
+          k.dueDate ? fmtDateStr(k.dueDate) : "—",
+          delayed ? "YES" : "No",
+        );
+        return row;
+      }),
+      headStyles: { fillColor: [...BRAND_BLUE], textColor: 255, fontSize: 7.5, fontStyle: "bold" },
+      bodyStyles: { fontSize: 7.5, textColor: [...TEXT_DARK] },
+      alternateRowStyles: { fillColor: [...LIGHT_GRAY] },
+      willDrawCell: (data) => {
+        if (data.section !== "body") return;
+        const baseIdx = 1 + (showEmployeeCol ? 1 : 0) + (showDeptCol ? 1 : 0);
+        const statusIdx = baseIdx + 1;
+        const achIdx    = baseIdx + 2;
+        const dueDateIdx = baseIdx + 3;
+        const overdueIdx = baseIdx + 4;
+        if (data.column.index === statusIdx) {
+          const found = Object.entries(KRA_STATUS_LABEL).find(([, v]) => v === String(data.cell.raw ?? ""));
+          const col = found ? KRA_STATUS_COLOR[found[0]] : undefined;
+          if (col) { data.cell.styles.textColor = [...col] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
+        }
+        if (data.column.index === achIdx) {
+          const pct = parseFloat(String(data.cell.raw ?? ""));
+          if (!isNaN(pct)) { const col = pct >= 80 ? GREEN : pct >= 60 ? BLUE_ACC : pct >= 40 ? AMBER : RED; data.cell.styles.textColor = [...col] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
+        }
+        if (data.column.index === dueDateIdx && isDelayed(dailyKras[data.row.index])) {
+          data.cell.styles.textColor = [...RED] as [number, number, number];
+        }
+        if (data.column.index === overdueIdx && String(data.cell.raw) === "YES") {
+          data.cell.styles.textColor = [...RED] as [number, number, number]; data.cell.styles.fontStyle = "bold";
+        }
+      },
+      columnStyles: { 0: { fontStyle: "bold" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
 
   // ── Department summary (if multi-dept) ──
   if (showDeptCol) {
-    const deptMap = new Map<string, { total: number; scoredWt: number; scoredWtedSum: number; approved: number }>();
+    const deptMap = new Map<string, { total: number; scoredWt: number; scoredWtedSum: number; approved: number; delayed: number; incomplete: number }>();
     for (const k of kras) {
       const dept = k.departmentName ?? "Unknown";
-      if (!deptMap.has(dept)) deptMap.set(dept, { total: 0, scoredWt: 0, scoredWtedSum: 0, approved: 0 });
+      if (!deptMap.has(dept)) deptMap.set(dept, { total: 0, scoredWt: 0, scoredWtedSum: 0, approved: 0, delayed: 0, incomplete: 0 });
       const d = deptMap.get(dept)!;
       d.total++;
       if (k.achievementPct != null && (k.weightage ?? 0) > 0) {
@@ -518,21 +649,28 @@ export function generateKraPerformancePDF(params: {
         d.scoredWtedSum += (k.achievementPct ?? 0) * (k.weightage ?? 0);
       }
       if (k.kraStatus === "approved") d.approved++;
+      if (isDelayed(k)) d.delayed++;
+      if (isIncomplete(k)) d.incomplete++;
     }
 
     if (y > 160) { doc.addPage(); y = 20; }
     y = sectionTitle(doc, y, "Department Summary");
     autoTable(doc, {
       startY: y,
-      head: [["Department", "Total KRAs", "Avg Achievement (Weighted)", "Fully Closed"]],
+      head: [["Department", "Total", "Delayed", "Incomplete", "Avg Achievement (Weighted)", "Fully Closed"]],
       body: [...deptMap.entries()].map(([dept, d]) => {
         const avg = d.scoredWt > 0 ? Math.round((d.scoredWtedSum / d.scoredWt) * 10) / 10 : 0;
-        return [dept, d.total, avg > 0 ? `${avg}%` : "—", d.approved];
+        return [dept, d.total, d.delayed, d.incomplete, avg > 0 ? `${avg}%` : "—", d.approved];
       }),
       headStyles: { fillColor: [...BRAND_BLUE], textColor: 255, fontSize: 8, fontStyle: "bold" },
       bodyStyles: { fontSize: 8, textColor: [...TEXT_DARK] },
       alternateRowStyles: { fillColor: [...LIGHT_GRAY] },
-      columnStyles: { 0: { fontStyle: "bold" }, 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" } },
+      willDrawCell: (data) => {
+        if (data.section !== "body") return;
+        if (data.column.index === 2 && Number(data.cell.raw) > 0) { data.cell.styles.textColor = [...RED] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
+        if (data.column.index === 3 && Number(data.cell.raw) > 0) { data.cell.styles.textColor = [...AMBER] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
+      },
+      columnStyles: { 0: { fontStyle: "bold" }, 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "center" } },
       margin: { left: 14, right: 14 },
     });
     y = (doc as any).lastAutoTable.finalY + 10;
@@ -545,12 +683,13 @@ export function generateKraPerformancePDF(params: {
   const head: string[] = ["KRA Title"];
   if (showEmployeeCol) head.push("Employee");
   if (showDeptCol) head.push("Department");
-  head.push("Frequency", "Weightage", "Status", "Achievement", "Due Date");
+  head.push("Frequency", "Weightage", "Status", "Achievement", "Due Date", "Delayed?");
 
   autoTable(doc, {
     startY: y,
     head: [head],
     body: kras.map((k) => {
+      const delayed = isDelayed(k);
       const row: (string | number)[] = [k.title ?? "—"];
       if (showEmployeeCol) row.push(k.employeeName ?? "Dept-wide");
       if (showDeptCol) row.push(k.departmentName ?? "—");
@@ -560,6 +699,7 @@ export function generateKraPerformancePDF(params: {
         KRA_STATUS_LABEL[k.kraStatus ?? ""] ?? titleCase(k.kraStatus ?? "—"),
         k.achievementPct != null ? `${k.achievementPct}%` : "—",
         k.dueDate ? fmtDateStr(k.dueDate) : "—",
+        delayed ? "YES" : "—",
       );
       return row;
     }),
@@ -567,22 +707,32 @@ export function generateKraPerformancePDF(params: {
     bodyStyles: { fontSize: 7.5, textColor: [...TEXT_DARK] },
     alternateRowStyles: { fillColor: [...LIGHT_GRAY] },
     willDrawCell: (data) => {
-      // Status column — index varies based on visible columns
-      const statusIdx = (showEmployeeCol ? 1 : 0) + (showDeptCol ? 1 : 0) + 3; // title+emp?+dept?+freq+wt+status
-      if (data.section === "body" && data.column.index === statusIdx) {
+      if (data.section !== "body") return;
+      const base     = 1 + (showEmployeeCol ? 1 : 0) + (showDeptCol ? 1 : 0);
+      const statusIdx  = base + 2;
+      const achIdx     = base + 3;
+      const dueDateIdx = base + 4;
+      const delayedIdx = base + 5;
+      if (data.column.index === statusIdx) {
         const found = Object.entries(KRA_STATUS_LABEL).find(([, v]) => v === String(data.cell.raw ?? ""));
         const col = found ? KRA_STATUS_COLOR[found[0]] : undefined;
         if (col) { data.cell.styles.textColor = [...col] as [number, number, number]; data.cell.styles.fontStyle = "bold"; }
       }
-      // Achievement column — next after status
-      const achIdx = statusIdx + 1;
-      if (data.section === "body" && data.column.index === achIdx) {
-        const pct = parseFloat(String(data.cell.raw ?? "0"));
+      if (data.column.index === achIdx) {
+        const pct = parseFloat(String(data.cell.raw ?? ""));
         if (!isNaN(pct) && String(data.cell.raw) !== "—") {
           const col = pct >= 80 ? GREEN : pct >= 60 ? BLUE_ACC : pct >= 40 ? AMBER : RED;
           data.cell.styles.textColor = [...col] as [number, number, number];
           data.cell.styles.fontStyle = "bold";
         }
+      }
+      if (data.column.index === dueDateIdx && isDelayed(kras[data.row.index])) {
+        data.cell.styles.textColor = [...RED] as [number, number, number];
+        data.cell.styles.fontStyle = "bold";
+      }
+      if (data.column.index === delayedIdx && String(data.cell.raw) === "YES") {
+        data.cell.styles.textColor = [...RED] as [number, number, number];
+        data.cell.styles.fontStyle = "bold";
       }
     },
     columnStyles: { 0: { fontStyle: "bold" } },

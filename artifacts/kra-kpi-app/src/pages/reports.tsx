@@ -217,6 +217,18 @@ const KRA_STATUS_OPTIONS = [
   { value: "manager_approved", label: "Manager Approved" },
   { value: "approved",         label: "Fully Approved" },
   { value: "rejected",         label: "Rejected" },
+  { value: "__delayed__",      label: "Delayed (Overdue)" },
+  { value: "__incomplete__",   label: "Incomplete (Not Closed)" },
+];
+
+const KRA_FREQ_OPTIONS = [
+  { value: "all",        label: "All Frequencies" },
+  { value: "daily",      label: "Daily" },
+  { value: "weekly",     label: "Weekly" },
+  { value: "bi_weekly",  label: "Bi-Weekly" },
+  { value: "monthly",    label: "Monthly" },
+  { value: "quarterly",  label: "Quarterly" },
+  { value: "yearly",     label: "Yearly" },
 ];
 
 function KraPerformanceCard({ user, employees, departments }: {
@@ -229,8 +241,11 @@ function KraPerformanceCard({ user, employees, departments }: {
   const isAdmin    = user.role === "admin" || user.role === "management";
 
   const [statusFilter, setStatusFilter]   = useState("all");
+  const [freqFilter,   setFreqFilter]     = useState("all");
   const [deptFilter,   setDeptFilter]     = useState<number | undefined>(isAdmin ? undefined : user.departmentId);
   const [generating,   setGenerating]     = useState(false);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const kraParams = isEmployee
     ? { employeeId: user.id }
@@ -242,9 +257,20 @@ function KraPerformanceCard({ user, employees, departments }: {
 
   const { data: kras } = useListKras(kraParams);
 
-  const filtered = (kras ?? []).filter(
-    (k) => statusFilter === "all" || k.kraStatus === statusFilter
-  ) as KraReportRecord[];
+  const filtered = (kras ?? []).filter((k) => {
+    const delayed    = !!(k.dueDate && k.dueDate < todayStr && k.kraStatus !== "approved" && k.kraStatus !== "rejected");
+    const incomplete = k.kraStatus !== "approved" && k.kraStatus !== "rejected";
+    const statusOk =
+      statusFilter === "all"             ? true :
+      statusFilter === "__delayed__"     ? delayed :
+      statusFilter === "__incomplete__"  ? incomplete :
+      k.kraStatus === statusFilter;
+    const freqOk = freqFilter === "all" || k.frequency === freqFilter;
+    return statusOk && freqOk;
+  }) as KraReportRecord[];
+
+  const delayedCount   = (kras ?? []).filter((k) => !!(k.dueDate && k.dueDate < todayStr && k.kraStatus !== "approved" && k.kraStatus !== "rejected")).length;
+  const incompleteCount = (kras ?? []).filter((k) => k.kraStatus !== "approved" && k.kraStatus !== "rejected").length;
 
   function handleGenerate() {
     if (!kras) return;
@@ -258,10 +284,10 @@ function KraPerformanceCard({ user, employees, departments }: {
           const dept = departments?.find((d) => d.id === deptFilter);
           scopeLabel = dept?.name ?? "Department";
         }
-        if (statusFilter !== "all") {
-          const s = KRA_STATUS_OPTIONS.find((o) => o.value === statusFilter);
-          if (s) scopeLabel += ` · ${s.label}`;
-        }
+        const statusOpt = KRA_STATUS_OPTIONS.find((o) => o.value === statusFilter);
+        if (statusOpt && statusFilter !== "all") scopeLabel += ` · ${statusOpt.label}`;
+        const freqOpt = KRA_FREQ_OPTIONS.find((o) => o.value === freqFilter);
+        if (freqOpt && freqFilter !== "all") scopeLabel += ` · ${freqOpt.label}`;
         generateKraPerformancePDF({
           scopeLabel,
           kras: filtered,
@@ -291,7 +317,7 @@ function KraPerformanceCard({ user, employees, departments }: {
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-between gap-4 pt-0">
         <p className="text-sm text-muted-foreground leading-relaxed">
-          KRA status breakdown, weighted average achievement, department summary, and a full KRA list with colour-coded status and achievement scores.
+          KRA status breakdown, delayed &amp; incomplete counts, daily KRA analysis, weighted average achievement, and a full list with colour-coded status and overdue flags.
         </p>
 
         <div className={`grid gap-3 ${isAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -327,12 +353,40 @@ function KraPerformanceCard({ user, employees, departments }: {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Frequency</Label>
+            <Select value={freqFilter} onValueChange={setFreqFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KRA_FREQ_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isEmployee && (
           <div className="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5 shrink-0" />
             Showing KRAs assigned to: <strong className="ml-1 text-foreground">{user.name}</strong>
+          </div>
+        )}
+
+        {kras && (delayedCount > 0 || incompleteCount > 0) && (
+          <div className="flex gap-2">
+            {delayedCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 border border-red-100">
+                {delayedCount} Overdue
+              </span>
+            )}
+            {incompleteCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-100">
+                {incompleteCount} Incomplete
+              </span>
+            )}
           </div>
         )}
 
