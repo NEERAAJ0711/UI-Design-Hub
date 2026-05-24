@@ -1,0 +1,81 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Build React frontend
+        run: pnpm --filter @workspace/kra-kpi-app run build
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            cd ${{ secrets.APP_PATH }}
+
+            echo ">>> Pulling latest code..."
+            git pull origin main
+
+            echo ">>> Installing dependencies..."
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            pnpm install
+
+            echo ">>> Running DB migrations..."
+            pnpm --filter @workspace/db run push
+
+            echo ">>> Building API server..."
+            pnpm --filter @workspace/api-server run build
+
+            echo ">>> Building React frontend..."
+            pnpm --filter @workspace/kra-kpi-app run build
+
+            echo ">>> Restarting API server..."
+            pm2 restart rps-api || pm2 start artifacts/api-server/dist/index.mjs --name rps-api
+
+            echo ">>> Saving PM2 process list..."
+            pm2 save
+
+            echo "✅ Deployment complete!"
+
+      - name: Notify success
+        if: success()
+        run: echo "🚀 Deployed successfully to Hostinger VPS!"
+
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed — check logs above."
