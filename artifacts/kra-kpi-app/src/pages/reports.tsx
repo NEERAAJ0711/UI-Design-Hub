@@ -33,6 +33,7 @@ import {
   generateKpiReportPDF,
   generateTaskReportPDF,
   generateEmployeeDatewiseReportPDF,
+  generateEmployeeTaskPerformancePDF,
 } from "@/lib/pdf-reports";
 
 const COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
@@ -102,9 +103,114 @@ function StatCard({ title, value, icon: Icon, sub, color = "text-primary" }: {
   );
 }
 
+type UserProp = {
+  id: number; name: string; role: string; departmentId: number;
+  departmentName?: string | null; designation?: string | null;
+};
+type EmpOption = { id: number; name: string; departmentId: number; departmentName?: string };
+
+function EmployeeTaskPerformanceCard({ user, employees }: {
+  user: UserProp;
+  employees?: EmpOption[];
+}) {
+  const isSelfOnly = user.role === "employee";
+  const isHodLike  = user.role === "hod" || user.role === "manager";
+  const isAdmin    = user.role === "admin" || user.role === "management";
+
+  const [selectedEmpId, setSelectedEmpId] = useState<number>(user.id);
+  const [generating, setGenerating] = useState(false);
+
+  const visibleEmployees = isAdmin
+    ? employees
+    : isHodLike
+      ? employees?.filter((e) => e.departmentId === user.departmentId)
+      : [{ id: user.id, name: user.name, departmentId: user.departmentId, departmentName: user.departmentName ?? "" }];
+
+  const { data: empTasks } = useListTasks({ assignedToId: selectedEmpId });
+  const selectedEmp = visibleEmployees?.find((e) => e.id === selectedEmpId);
+
+  function handleGenerate() {
+    if (!empTasks || !selectedEmp) return;
+    setGenerating(true);
+    setTimeout(() => {
+      try {
+        generateEmployeeTaskPerformancePDF({
+          employeeName: selectedEmp.name,
+          departmentName: selectedEmp.departmentName ?? "",
+          designation: user.id === selectedEmpId ? (user.designation ?? undefined) : undefined,
+          generatedDate: new Date(),
+          tasks: empTasks,
+        });
+      } finally {
+        setGenerating(false);
+      }
+    }, 50);
+  }
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-4">
+          <div className="h-11 w-11 rounded-xl border flex items-center justify-center shrink-0 bg-rose-50 text-rose-600 border-rose-100">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base leading-snug">My Task Performance Report</CardTitle>
+            <span className="inline-block mt-1 text-[10px] font-medium tracking-wide text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              PDF · A4 Portrait
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col justify-between gap-4 pt-0">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          A personal task performance report showing completion rate, status &amp; priority breakdown, average progress, and a full task list — all tasks to date.
+        </p>
+
+        {!isSelfOnly && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Employee</Label>
+            <Select value={selectedEmpId.toString()} onValueChange={(v) => setSelectedEmpId(Number(v))}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {visibleEmployees?.map((e) => (
+                  <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {isSelfOnly && (
+          <div className="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Generating report for: <strong className="ml-1 text-foreground">{user.name}</strong>
+          </div>
+        )}
+
+        <Button
+          className="w-full gap-2"
+          disabled={!empTasks || generating}
+          onClick={handleGenerate}
+        >
+          {generating ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
+          ) : !empTasks ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Loading data…</>
+          ) : (
+            <><Download className="h-4 w-4" /> Download PDF</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EmployeeDatewiseCard({ user, employees, departments }: {
-  user: { id: number; name: string; role: string; departmentId: number; departmentName?: string | null; designation?: string | null };
-  employees?: { id: number; name: string; departmentId: number; departmentName?: string }[];
+  user: UserProp;
+  employees?: EmpOption[];
   departments?: { id: number; name: string }[];
 }) {
   const isEmployee = user.role === "employee";
@@ -531,7 +637,15 @@ export default function Reports() {
               );
             })}
 
-            {/* Employee Date-wise report — accessible to all roles */}
+            {/* My Task Performance report — all roles, scoped by role */}
+            {user && (
+              <EmployeeTaskPerformanceCard
+                user={user}
+                employees={employees}
+              />
+            )}
+
+            {/* Employee Date-wise Task + KRA + KPI — all roles, scoped by role */}
             {user && (
               <EmployeeDatewiseCard
                 user={user}
