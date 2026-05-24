@@ -235,7 +235,11 @@ export default function TaskDetail() {
   const isHOD      = ["hod","manager","management","admin"].includes(user?.role ?? "");
   const canManage  = user?.role !== "employee";
 
-  const canApprove      = isHOD && !step2Done;
+  const canApprove      = !step2Done && (
+    user?.role === "admin" ||
+    user?.role === "management" ||
+    ((user?.role === "hod" || user?.role === "manager") && user?.departmentId === task?.departmentId)
+  );
   const canUpdateStatus = step2Done && !step4Done && (isAssignee || isHOD);
   const canCreatorClose = step2Done && !step4Done && isCreator;
 
