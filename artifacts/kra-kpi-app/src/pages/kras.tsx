@@ -11,7 +11,10 @@ import {
   useApproveKraClosure,
   useHrApproveKra,
   useGetPendingApprovals,
+  useListKraDailyLogs,
+  useKraDailyCheckIn,
   getListKrasQueryKey,
+  getListKraDailyLogsQueryKey,
   getGetPendingApprovalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,7 +33,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle,
-  Bell, User, Users, ShieldCheck, AlertTriangle,
+  Bell, User, Users, ShieldCheck, AlertTriangle, CalendarCheck, Circle,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -150,6 +153,160 @@ export default function KRAs() {
   return <FullKras />;
 }
 
+// ── Daily check-in strip for one KRA ─────────────────────────────────────────
+function DailyKraCard({ kra, employeeId }: { kra: KraRow; employeeId: number }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const checkIn = useKraDailyCheckIn();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Build last-14-calendar-days window (Mon–Fri shown, weekends skipped visually)
+  const days: { date: string; label: string; isWeekend: boolean; isToday: boolean }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    const dow = d.getDay(); // 0=Sun 6=Sat
+    days.push({
+      date: iso,
+      label: ["Su","Mo","Tu","We","Th","Fr","Sa"][dow]!,
+      isWeekend: dow === 0 || dow === 6,
+      isToday: iso === todayStr,
+    });
+  }
+
+  const startDate = days[0]!.date;
+  const { data: logs } = useListKraDailyLogs(
+    { kraId: kra.id, employeeId, startDate, endDate: todayStr },
+    { query: { queryKey: getListKraDailyLogsQueryKey({ kraId: kra.id, employeeId, startDate, endDate: todayStr }) } }
+  );
+
+  const logMap = new Map((logs ?? []).map((l) => [l.logDate, l.isDone]));
+  const todayDone = logMap.get(todayStr) ?? false;
+
+  // Streak: consecutive working days from today backwards where isDone=true
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0; i--) {
+    const d = days[i]!;
+    if (d.isWeekend) continue;
+    if (logMap.get(d.date) === true) streak++;
+    else break;
+  }
+
+  function handleToggleToday() {
+    checkIn.mutate(
+      { data: { kraId: kra.id, employeeId, logDate: todayStr, isDone: !todayDone } },
+      {
+        onSuccess: (result) => {
+          queryClient.invalidateQueries({ queryKey: getListKraDailyLogsQueryKey({ kraId: kra.id, employeeId, startDate, endDate: todayStr }) });
+          queryClient.invalidateQueries({ queryKey: getListKrasQueryKey({ employeeId }) });
+          toast({
+            title: result.isDone ? "✓ Checked in!" : "Check-in removed",
+            description: `Achievement: ${result.achievementPct.toFixed(1)}%`,
+          });
+        },
+        onError: () => toast({ title: "Failed to check in", variant: "destructive" }),
+      }
+    );
+  }
+
+  const achievement = kra.achievementPct ?? 0;
+  const achievementColor =
+    achievement >= 80 ? "text-green-600" :
+    achievement >= 60 ? "text-blue-600" :
+    achievement >= 40 ? "text-amber-600" :
+    achievement > 0   ? "text-red-600"  : "text-muted-foreground";
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm leading-tight truncate">{kra.title}</div>
+            {kra.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{kra.description}</div>}
+          </div>
+          <div className="text-right shrink-0">
+            <div className={`text-xl font-bold tabular-nums ${achievementColor}`}>{achievement.toFixed(1)}%</div>
+            <div className="text-[10px] text-muted-foreground">Achievement</div>
+          </div>
+        </div>
+
+        {/* 14-day strip — weekdays only */}
+        <div className="flex gap-1.5 flex-wrap">
+          {days.filter((d) => !d.isWeekend).map((d) => {
+            const done = logMap.get(d.date);
+            const isFuture = d.date > todayStr;
+            return (
+              <div key={d.date} className="flex flex-col items-center gap-0.5">
+                <div className="text-[9px] text-muted-foreground">{d.label}</div>
+                <div
+                  title={d.date}
+                  className={`
+                    w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors
+                    ${isFuture ? "border-dashed border-muted-foreground/30 bg-transparent" :
+                      done === true ? "bg-green-500 border-green-500" :
+                      done === false ? "bg-red-100 border-red-300" :
+                      "border-muted-foreground/40 bg-muted/40"}
+                    ${d.isToday ? "ring-2 ring-offset-1 ring-blue-400" : ""}
+                  `}
+                >
+                  {!isFuture && done === true && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+                  {!isFuture && done === false && <XCircle className="h-3 w-3 text-red-400" />}
+                </div>
+                <div className="text-[8px] text-muted-foreground">{d.date.slice(8)}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer: streak + button */}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {streak > 0
+              ? <span className="font-medium text-green-600">🔥 {streak}-day streak</span>
+              : <span>No current streak</span>}
+            <span className="mx-1.5">·</span>
+            <span>{kra.weightage}% weight</span>
+          </div>
+          <Button
+            size="sm"
+            variant={todayDone ? "default" : "outline"}
+            className={todayDone ? "bg-green-600 hover:bg-green-700 text-white gap-1.5" : "gap-1.5"}
+            disabled={checkIn.isPending || kra.kraStatus === "approved"}
+            onClick={handleToggleToday}
+          >
+            {todayDone ? <><CheckCircle2 className="h-3.5 w-3.5" /> Done Today</> : <><CalendarCheck className="h-3.5 w-3.5" /> Check In</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Daily KRAs panel (shown at top of employee view) ─────────────────────────
+function DailyKrasPanel({ kras, employeeId }: { kras: KraRow[]; employeeId: number }) {
+  const daily = kras.filter((k) => k.frequency === "daily" && k.kraStatus !== "approved");
+  if (daily.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <CalendarCheck className="h-5 w-5 text-blue-600" />
+        <h3 className="font-semibold text-base">Daily Check-In</h3>
+        <Badge variant="secondary" className="text-xs">{daily.length} active</Badge>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-1">
+        Mark each working day as done. Achievement % is calculated automatically: <strong>days done ÷ working days × 100</strong>.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {daily.map((k) => <DailyKraCard key={k.id} kra={k} employeeId={employeeId} />)}
+      </div>
+    </div>
+  );
+}
+
 // ── Employee KRA View ──────────────────────────────────────────────────────────
 function EmployeeKras() {
   const { user } = useAuth();
@@ -175,11 +332,15 @@ function EmployeeKras() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 overflow-y-auto">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 overflow-y-auto">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">My Key Result Areas</h2>
         <p className="text-muted-foreground">Your assigned KRAs. Submit for closure once achieved — requires manager and HOD approval.</p>
       </div>
+
+      {/* Daily check-in panel — shown only when employee has active daily KRAs */}
+      {!isLoading && kras && <DailyKrasPanel kras={kras} employeeId={user!.id} />}
+
       <MyKraTable kras={kras} isLoading={isLoading} onSubmitClosure={setConfirmSubmitId} />
       <AlertDialog open={!!confirmSubmitId} onOpenChange={(open) => !open && setConfirmSubmitId(null)}>
         <AlertDialogContent>

@@ -11,6 +11,7 @@ import designationsRouter from "./designations";
 import companiesRouter from "./companies";
 import holidaysRouter from "./holidays";
 import scoreWeightsRouter from "./score-weights";
+import kraDailyLogsRouter from "./kra-daily-logs";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(designationsRouter);
 router.use(companiesRouter);
 router.use(holidaysRouter);
 router.use(scoreWeightsRouter);
+router.use(kraDailyLogsRouter);
 
 export default router;

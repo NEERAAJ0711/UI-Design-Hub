@@ -44,6 +44,8 @@ import type {
   EmployeeUpdate,
   ErrorResponse,
   GetEmployeeDashboardSummaryParams,
+  GetKraWorkingDays200,
+  GetKraWorkingDaysParams,
   GetPendingApprovalsParams,
   GetRecentActivityParams,
   GetTopPerformersParams,
@@ -57,11 +59,15 @@ import type {
   KpiInput,
   KpiUpdate,
   Kra,
+  KraDailyCheckInInput,
+  KraDailyCheckInResult,
+  KraDailyLog,
   KraInput,
   KraScoreInput,
   KraUpdate,
   ListEmployeesParams,
   ListKpisParams,
+  ListKraDailyLogsParams,
   ListKrasParams,
   ListTasksParams,
   LoginInput,
@@ -2583,6 +2589,245 @@ export const useApproveKraClosure = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getApproveKraClosureMutationOptions(options));
     }
+
+export const getListKraDailyLogsUrl = (params?: ListKraDailyLogsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/kra-daily-logs?${stringifiedParams}` : `/api/kra-daily-logs`
+}
+
+/**
+ * @summary List daily check-in logs
+ */
+export const listKraDailyLogs = async (params?: ListKraDailyLogsParams, options?: RequestInit): Promise<KraDailyLog[]> => {
+
+  return customFetch<KraDailyLog[]>(getListKraDailyLogsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListKraDailyLogsQueryKey = (params?: ListKraDailyLogsParams,) => {
+    return [
+    `/api/kra-daily-logs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListKraDailyLogsQueryOptions = <TData = Awaited<ReturnType<typeof listKraDailyLogs>>, TError = ErrorType<unknown>>(params?: ListKraDailyLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKraDailyLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListKraDailyLogsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listKraDailyLogs>>> = ({ signal }) => listKraDailyLogs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listKraDailyLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListKraDailyLogsQueryResult = NonNullable<Awaited<ReturnType<typeof listKraDailyLogs>>>
+export type ListKraDailyLogsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List daily check-in logs
+ */
+
+export function useListKraDailyLogs<TData = Awaited<ReturnType<typeof listKraDailyLogs>>, TError = ErrorType<unknown>>(
+ params?: ListKraDailyLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKraDailyLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListKraDailyLogsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getKraDailyCheckInUrl = () => {
+
+
+
+
+  return `/api/kra-daily-logs/check-in`
+}
+
+/**
+ * @summary Mark a daily KRA as done or not-done for a given date
+ */
+export const kraDailyCheckIn = async (kraDailyCheckInInput: KraDailyCheckInInput, options?: RequestInit): Promise<KraDailyCheckInResult> => {
+
+  return customFetch<KraDailyCheckInResult>(getKraDailyCheckInUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      kraDailyCheckInInput,)
+  }
+);}
+
+
+
+
+export const getKraDailyCheckInMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof kraDailyCheckIn>>, TError,{data: BodyType<KraDailyCheckInInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof kraDailyCheckIn>>, TError,{data: BodyType<KraDailyCheckInInput>}, TContext> => {
+
+const mutationKey = ['kraDailyCheckIn'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof kraDailyCheckIn>>, {data: BodyType<KraDailyCheckInInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  kraDailyCheckIn(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type KraDailyCheckInMutationResult = NonNullable<Awaited<ReturnType<typeof kraDailyCheckIn>>>
+    export type KraDailyCheckInMutationBody = BodyType<KraDailyCheckInInput>
+    export type KraDailyCheckInMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark a daily KRA as done or not-done for a given date
+ */
+export const useKraDailyCheckIn = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof kraDailyCheckIn>>, TError,{data: BodyType<KraDailyCheckInInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof kraDailyCheckIn>>,
+        TError,
+        {data: BodyType<KraDailyCheckInInput>},
+        TContext
+      > => {
+      return useMutation(getKraDailyCheckInMutationOptions(options));
+    }
+
+export const getGetKraWorkingDaysUrl = (params: GetKraWorkingDaysParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/kra-daily-logs/working-days?${stringifiedParams}` : `/api/kra-daily-logs/working-days`
+}
+
+/**
+ * @summary Get working days between two dates (excludes weekends & holidays)
+ */
+export const getKraWorkingDays = async (params: GetKraWorkingDaysParams, options?: RequestInit): Promise<GetKraWorkingDays200> => {
+
+  return customFetch<GetKraWorkingDays200>(getGetKraWorkingDaysUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetKraWorkingDaysQueryKey = (params?: GetKraWorkingDaysParams,) => {
+    return [
+    `/api/kra-daily-logs/working-days`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetKraWorkingDaysQueryOptions = <TData = Awaited<ReturnType<typeof getKraWorkingDays>>, TError = ErrorType<unknown>>(params: GetKraWorkingDaysParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKraWorkingDays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetKraWorkingDaysQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getKraWorkingDays>>> = ({ signal }) => getKraWorkingDays(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getKraWorkingDays>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetKraWorkingDaysQueryResult = NonNullable<Awaited<ReturnType<typeof getKraWorkingDays>>>
+export type GetKraWorkingDaysQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get working days between two dates (excludes weekends & holidays)
+ */
+
+export function useGetKraWorkingDays<TData = Awaited<ReturnType<typeof getKraWorkingDays>>, TError = ErrorType<unknown>>(
+ params: GetKraWorkingDaysParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKraWorkingDays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetKraWorkingDaysQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListKpisUrl = (params?: ListKpisParams,) => {
   const normalizedParams = new URLSearchParams();

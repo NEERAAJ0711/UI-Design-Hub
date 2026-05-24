@@ -340,6 +340,39 @@ export interface HrApproveKraInput {
   approved: boolean;
 }
 
+export interface KraDailyLog {
+  id: number;
+  kraId: number;
+  employeeId: number;
+  logDate: string;
+  isDone: boolean;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KraDailyCheckInInput {
+  kraId: number;
+  employeeId: number;
+  logDate: string;
+  isDone: boolean;
+  notes?: string;
+}
+
+export interface KraDailyCheckInResult {
+  id: number;
+  kraId: number;
+  employeeId: number;
+  logDate: string;
+  isDone: boolean;
+  /** @nullable */
+  notes?: string | null;
+  achievementPct: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface KraScoreInput {
   achievementPct: number;
 }
@@ -805,6 +838,23 @@ export type ResetEmployeePassword200 = {
 export type ListKrasParams = {
 departmentId?: number;
 employeeId?: number;
+};
+
+export type ListKraDailyLogsParams = {
+kraId?: number;
+employeeId?: number;
+startDate?: string;
+endDate?: string;
+};
+
+export type GetKraWorkingDaysParams = {
+startDate: string;
+endDate: string;
+};
+
+export type GetKraWorkingDays200 = {
+  days: string[];
+  count: number;
 };
 
 export type ListKpisParams = {

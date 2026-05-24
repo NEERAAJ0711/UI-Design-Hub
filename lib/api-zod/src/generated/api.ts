@@ -677,6 +677,67 @@ export const ApproveKraClosureResponse = zod.object({
 
 
 /**
+ * @summary List daily check-in logs
+ */
+export const ListKraDailyLogsQueryParams = zod.object({
+  "kraId": zod.coerce.number().optional(),
+  "employeeId": zod.coerce.number().optional(),
+  "startDate": zod.coerce.string().optional(),
+  "endDate": zod.coerce.string().optional()
+})
+
+export const ListKraDailyLogsResponseItem = zod.object({
+  "id": zod.number(),
+  "kraId": zod.number(),
+  "employeeId": zod.number(),
+  "logDate": zod.string(),
+  "isDone": zod.boolean(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListKraDailyLogsResponse = zod.array(ListKraDailyLogsResponseItem)
+
+
+/**
+ * @summary Mark a daily KRA as done or not-done for a given date
+ */
+export const KraDailyCheckInBody = zod.object({
+  "kraId": zod.number(),
+  "employeeId": zod.number(),
+  "logDate": zod.string(),
+  "isDone": zod.boolean(),
+  "notes": zod.string().optional()
+})
+
+export const KraDailyCheckInResponse = zod.object({
+  "id": zod.number(),
+  "kraId": zod.number(),
+  "employeeId": zod.number(),
+  "logDate": zod.string(),
+  "isDone": zod.boolean(),
+  "notes": zod.string().nullish(),
+  "achievementPct": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get working days between two dates (excludes weekends & holidays)
+ */
+export const GetKraWorkingDaysQueryParams = zod.object({
+  "startDate": zod.coerce.string(),
+  "endDate": zod.coerce.string()
+})
+
+export const GetKraWorkingDaysResponse = zod.object({
+  "days": zod.array(zod.string()),
+  "count": zod.number()
+})
+
+
+/**
  * @summary List KPIs
  */
 export const ListKpisQueryParams = zod.object({

@@ -718,6 +718,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/Kra"
 
+  # ── KRA Daily Logs ────────────────────────────────────────────────────────────
+  /kra-daily-logs:
+    get:
+      operationId: listKraDailyLogs
+      tags: [kras]
+      summary: List daily check-in logs
+      parameters:
+        - name: kraId
+          in: query
+          schema: { type: integer }
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: startDate
+          in: query
+          schema: { type: string }
+        - name: endDate
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KraDailyLog"
+
+  /kra-daily-logs/check-in:
+    post:
+      operationId: kraDailyCheckIn
+      tags: [kras]
+      summary: Mark a daily KRA as done or not-done for a given date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KraDailyCheckInInput"
+      responses:
+        "200":
+          description: Updated log + recalculated achievement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KraDailyCheckInResult"
+
+  /kra-daily-logs/working-days:
+    get:
+      operationId: getKraWorkingDays
+      tags: [kras]
+      summary: Get working days between two dates (excludes weekends & holidays)
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema: { type: string }
+        - name: endDate
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Working days
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [days, count]
+                properties:
+                  days:  { type: array, items: { type: string } }
+                  count: { type: integer }
+
   # ── KPIs ──────────────────────────────────────────────────────────────────────
   /kpis:
     get:
@@ -1548,6 +1622,43 @@ components:
       required: [approved]
       properties:
         approved: { type: boolean }
+
+    KraDailyLog:
+      type: object
+      required: [id, kraId, employeeId, logDate, isDone, createdAt, updatedAt]
+      properties:
+        id:         { type: integer }
+        kraId:      { type: integer }
+        employeeId: { type: integer }
+        logDate:    { type: string }
+        isDone:     { type: boolean }
+        notes:      { type: ["string", "null"] }
+        createdAt:  { type: string }
+        updatedAt:  { type: string }
+
+    KraDailyCheckInInput:
+      type: object
+      required: [kraId, employeeId, logDate, isDone]
+      properties:
+        kraId:      { type: integer }
+        employeeId: { type: integer }
+        logDate:    { type: string }
+        isDone:     { type: boolean }
+        notes:      { type: string }
+
+    KraDailyCheckInResult:
+      type: object
+      required: [id, kraId, employeeId, logDate, isDone, achievementPct, createdAt, updatedAt]
+      properties:
+        id:             { type: integer }
+        kraId:          { type: integer }
+        employeeId:     { type: integer }
+        logDate:        { type: string }
+        isDone:         { type: boolean }
+        notes:          { type: ["string", "null"] }
+        achievementPct: { type: number }
+        createdAt:      { type: string }
+        updatedAt:      { type: string }
 
     KraScoreInput:
       type: object

@@ -9,3 +9,4 @@ export * from "./designations";
 export * from "./companies";
 export * from "./score_weights";
 export * from "./holidays";
+export * from "./kra_daily_logs";
