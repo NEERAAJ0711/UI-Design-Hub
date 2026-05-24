@@ -23,7 +23,7 @@ import {
 } from "recharts";
 import {
   Users, CheckSquare, Target, TrendingUp, Building2, Award, AlertTriangle, BarChart2,
-  FileText, Download, LayoutDashboard, Loader2, CalendarRange, Lock,
+  FileText, Download, LayoutDashboard, Loader2, CalendarRange, Lock, ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
@@ -34,6 +34,8 @@ import {
   generateTaskReportPDF,
   generateEmployeeDatewiseReportPDF,
   generateEmployeeTaskPerformancePDF,
+  generateKraPerformancePDF,
+  type KraReportRecord,
 } from "@/lib/pdf-reports";
 
 const COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
@@ -199,6 +201,157 @@ function EmployeeTaskPerformanceCard({ user, employees }: {
             <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
           ) : !empTasks ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Loading data…</>
+          ) : (
+            <><Download className="h-4 w-4" /> Download PDF</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+const KRA_STATUS_OPTIONS = [
+  { value: "all",              label: "All Statuses" },
+  { value: "active",           label: "Active" },
+  { value: "submitted",        label: "Submitted" },
+  { value: "manager_approved", label: "Manager Approved" },
+  { value: "approved",         label: "Fully Approved" },
+  { value: "rejected",         label: "Rejected" },
+];
+
+function KraPerformanceCard({ user, employees, departments }: {
+  user: UserProp;
+  employees?: EmpOption[];
+  departments?: { id: number; name: string }[];
+}) {
+  const isEmployee = user.role === "employee";
+  const isHodLike  = user.role === "hod" || user.role === "manager";
+  const isAdmin    = user.role === "admin" || user.role === "management";
+
+  const [statusFilter, setStatusFilter]   = useState("all");
+  const [deptFilter,   setDeptFilter]     = useState<number | undefined>(isAdmin ? undefined : user.departmentId);
+  const [generating,   setGenerating]     = useState(false);
+
+  const kraParams = isEmployee
+    ? { employeeId: user.id }
+    : isHodLike
+      ? { departmentId: user.departmentId }
+      : deptFilter
+        ? { departmentId: deptFilter }
+        : {};
+
+  const { data: kras } = useListKras(kraParams);
+
+  const filtered = (kras ?? []).filter(
+    (k) => statusFilter === "all" || k.kraStatus === statusFilter
+  ) as KraReportRecord[];
+
+  function handleGenerate() {
+    if (!kras) return;
+    setGenerating(true);
+    setTimeout(() => {
+      try {
+        let scopeLabel = "All Departments";
+        if (isEmployee) scopeLabel = user.name;
+        else if (isHodLike) scopeLabel = user.departmentName ?? "Department";
+        else if (deptFilter) {
+          const dept = departments?.find((d) => d.id === deptFilter);
+          scopeLabel = dept?.name ?? "Department";
+        }
+        if (statusFilter !== "all") {
+          const s = KRA_STATUS_OPTIONS.find((o) => o.value === statusFilter);
+          if (s) scopeLabel += ` · ${s.label}`;
+        }
+        generateKraPerformancePDF({
+          scopeLabel,
+          kras: filtered,
+          showEmployeeCol: !isEmployee,
+          showDeptCol: isAdmin && !deptFilter,
+        });
+      } finally {
+        setGenerating(false);
+      }
+    }, 50);
+  }
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-4">
+          <div className="h-11 w-11 rounded-xl border flex items-center justify-center shrink-0 bg-teal-50 text-teal-600 border-teal-100">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base leading-snug">KRA Performance Report</CardTitle>
+            <span className="inline-block mt-1 text-[10px] font-medium tracking-wide text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              PDF · A4 Landscape
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col justify-between gap-4 pt-0">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          KRA status breakdown, weighted average achievement, department summary, and a full KRA list with colour-coded status and achievement scores.
+        </p>
+
+        <div className={`grid gap-3 ${isAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
+          {isAdmin && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Department</Label>
+              <Select
+                value={deptFilter?.toString() ?? "all"}
+                onValueChange={(v) => setDeptFilter(v === "all" ? undefined : Number(v))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments?.map((d) => (
+                    <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Status Filter</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KRA_STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {isEmployee && (
+          <div className="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Showing KRAs assigned to: <strong className="ml-1 text-foreground">{user.name}</strong>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{filtered.length} KRA{filtered.length !== 1 ? "s" : ""} matched</span>
+          {!kras && <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</span>}
+        </div>
+
+        <Button
+          className="w-full gap-2"
+          disabled={!kras || generating || filtered.length === 0}
+          onClick={handleGenerate}
+        >
+          {generating ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
+          ) : !kras ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Loading data…</>
+          ) : filtered.length === 0 ? (
+            "No KRAs match the filter"
           ) : (
             <><Download className="h-4 w-4" /> Download PDF</>
           )}
@@ -642,6 +795,15 @@ export default function Reports() {
               <EmployeeTaskPerformanceCard
                 user={user}
                 employees={employees}
+              />
+            )}
+
+            {/* KRA Performance report — all roles, scoped by role */}
+            {user && (
+              <KraPerformanceCard
+                user={user}
+                employees={employees}
+                departments={departments}
               />
             )}
 
