@@ -326,6 +326,7 @@ export function generateEmployeeDatewiseReportPDF(params: {
           const s = String(data.cell.raw ?? "").toLowerCase().replace(/ /g, "_");
           const colors: Record<string, readonly [number, number, number]> = {
             completed: GREEN, delayed: RED, in_progress: [80, 100, 220], blocked: AMBER, todo: MID_GRAY,
+            approved: GREEN, rejected: RED, awaiting_hod_approval: AMBER,
           };
           const col = colors[s] ?? MID_GRAY;
           doc.setTextColor(...col); doc.setFont("helvetica", "bold");
