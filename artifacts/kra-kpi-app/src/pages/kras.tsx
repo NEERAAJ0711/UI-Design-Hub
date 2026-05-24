@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, MoreHorizontal, Pencil, Trash2, Star, Send, CheckCircle2, XCircle,
@@ -218,7 +217,6 @@ function MyKraTable({
               <TableHead>Frequency</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead>Weightage</TableHead>
-              <TableHead className="w-[200px]">Achievement</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
@@ -227,7 +225,7 @@ function MyKraTable({
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {[200, 90, 90, 60, 200, 100, 80].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
+                  {[200, 90, 90, 60, 100, 80].map((w, j) => <TableCell key={j}><Skeleton className={`h-4 w-[${w}px]`} /></TableCell>)}
                 </TableRow>
               ))
             ) : kras?.length ? (
@@ -243,12 +241,6 @@ function MyKraTable({
                   <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
                   <TableCell>{formatDueDateCell(kra.dueDate, kra.frequency)}</TableCell>
                   <TableCell>{kra.weightage}%</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={kra.achievementPct ?? 0} className="flex-1 h-1.5" />
-                      <span className="text-xs font-medium w-9 text-right">{kra.achievementPct ?? 0}%</span>
-                    </div>
-                  </TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${kraStatusColors[kra.kraStatus] ?? ""}`}>
                       {kra.kraStatus.replace("_", " ")}
@@ -1060,7 +1052,7 @@ function TeamKraTable({
   onDelete: (kra: KraRow) => void;
   onScore?: (kra: KraRow) => void;
 }) {
-  const colCount = showDeptColumn ? 9 : 8;
+  const colCount = showDeptColumn ? 8 : 7;
   return (
     <Card>
       <CardContent className="p-0">
@@ -1073,7 +1065,6 @@ function TeamKraTable({
               <TableHead>Frequency</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead>Weightage</TableHead>
-              <TableHead className="w-[180px]">Achievement</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -1104,12 +1095,6 @@ function TeamKraTable({
                   <TableCell className="text-sm">{FREQUENCY_LABELS[kra.frequency ?? ""] ?? kra.frequency ?? "—"}</TableCell>
                   <TableCell>{formatDueDateCell(kra.dueDate, kra.frequency)}</TableCell>
                   <TableCell>{kra.weightage}%</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={kra.achievementPct ?? 0} className="flex-1 h-1.5" />
-                      <span className="text-xs font-medium w-9 text-right">{kra.achievementPct ?? 0}%</span>
-                    </div>
-                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${kraStatusColors[kra.kraStatus] ?? ""}`}>
