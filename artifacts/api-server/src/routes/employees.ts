@@ -191,7 +191,10 @@ router.post("/employees/:id/reset-password", async (req, res) => {
   if (!target) { res.status(404).json({ error: "Employee not found" }); return; }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await db.update(employeesTable).set({ passwordHash }).where(eq(employeesTable.id, id));
+  await db
+    .update(employeesTable)
+    .set({ passwordHash, mustChangePassword: true })
+    .where(eq(employeesTable.id, id));
 
   await db.insert(activityLogTable).values({
     type: "password_reset",

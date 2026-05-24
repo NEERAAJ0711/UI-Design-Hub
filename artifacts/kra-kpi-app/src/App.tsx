@@ -14,6 +14,7 @@ import Admin from "@/pages/admin";
 import Reports from "@/pages/reports";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+import { ForceChangePassword } from "@/components/force-change-password";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -43,6 +44,10 @@ function ProtectedRoutes() {
 
   if (!user) {
     return <Redirect to="/login" />;
+  }
+
+  if (user.mustChangePassword) {
+    return <ForceChangePassword />;
   }
 
   return (

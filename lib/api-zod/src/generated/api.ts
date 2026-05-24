@@ -28,7 +28,8 @@ export const LoginResponse = zod.object({
   "company": zod.string().nullish(),
   "departmentId": zod.number(),
   "departmentName": zod.string().nullish(),
-  "managerId": zod.number().nullish()
+  "managerId": zod.number().nullish(),
+  "mustChangePassword": zod.boolean()
 })
 
 
@@ -44,7 +45,26 @@ export const GetCurrentUserResponse = zod.object({
   "company": zod.string().nullish(),
   "departmentId": zod.number(),
   "departmentName": zod.string().nullish(),
-  "managerId": zod.number().nullish()
+  "managerId": zod.number().nullish(),
+  "mustChangePassword": zod.boolean()
+})
+
+
+/**
+ * @summary Change own password (required on first login)
+ */
+
+export const changePasswordBodyNewPasswordMin = 6;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string().min(1),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+export const ChangePasswordResponse = zod.object({
+  "ok": zod.boolean().optional()
 })
 
 

@@ -21,4 +21,5 @@ export interface CurrentUser {
   departmentName?: string | null;
   /** @nullable */
   managerId?: number | null;
+  mustChangePassword: boolean;
 }

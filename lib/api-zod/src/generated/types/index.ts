@@ -14,6 +14,8 @@ export * from './bulkUploadEmployeesBody';
 export * from './bulkUploadResult';
 export * from './bulkUploadResultErrorsItem';
 export * from './calculateKpiBatch201';
+export * from './changePassword200';
+export * from './changePasswordInput';
 export * from './company';
 export * from './companyInput';
 export * from './crossDeptTaskApproval';

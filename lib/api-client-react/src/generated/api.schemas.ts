@@ -36,6 +36,14 @@ export interface CurrentUser {
   departmentName?: string | null;
   /** @nullable */
   managerId?: number | null;
+  mustChangePassword: boolean;
+}
+
+export interface ChangePasswordInput {
+  /** @minLength 1 */
+  currentPassword: string;
+  /** @minLength 6 */
+  newPassword: string;
 }
 
 export interface ErrorResponse {
@@ -759,6 +767,10 @@ export interface KpiCalculateBatchInput {
   month: number;
   year: number;
 }
+
+export type ChangePassword200 = {
+  ok?: boolean;
+};
 
 export type Logout200 = {
   ok?: boolean;

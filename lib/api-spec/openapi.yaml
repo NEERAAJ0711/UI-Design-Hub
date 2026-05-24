@@ -78,6 +78,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change own password (required on first login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "400":
+          description: Validation error or wrong current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /auth/logout:
     post:
       operationId: logout
@@ -1289,17 +1322,25 @@ components:
 
     CurrentUser:
       type: object
-      required: [id, name, email, role, departmentId]
+      required: [id, name, email, role, departmentId, mustChangePassword]
       properties:
-        id:             { type: integer }
-        name:           { type: string }
-        email:          { type: string }
-        role:           { type: string, enum: [admin, management, hod, manager, employee] }
-        designation:    { type: ["string", "null"] }
-        company:       { type: ["string", "null"] }
-        departmentId:   { type: integer }
-        departmentName: { type: ["string", "null"] }
-        managerId:      { type: ["integer", "null"] }
+        id:                 { type: integer }
+        name:               { type: string }
+        email:              { type: string }
+        role:               { type: string, enum: [admin, management, hod, manager, employee] }
+        designation:        { type: ["string", "null"] }
+        company:            { type: ["string", "null"] }
+        departmentId:       { type: integer }
+        departmentName:     { type: ["string", "null"] }
+        managerId:          { type: ["integer", "null"] }
+        mustChangePassword: { type: boolean }
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword:     { type: string, minLength: 6 }
 
     ErrorResponse:
       type: object
