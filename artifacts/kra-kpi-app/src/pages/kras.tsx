@@ -1279,14 +1279,14 @@ function KraFormDialog({
                 )} />
               )}
               {editTarget && editTarget.hrApprovalStatus !== "hr_approved" ? (
-                <FormItem>
-                  <FormLabel>Assign to Employee</FormLabel>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium leading-none">Assign to Employee</p>
                   <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${hrStatusColors[editTarget.hrApprovalStatus ?? "pending_hr"]} opacity-80`}>
                     {editTarget.hrApprovalStatus === "hr_rejected"
                       ? "Assignment blocked — HR rejected this KRA."
                       : "Assignment locked — awaiting HR approval."}
                   </div>
-                </FormItem>
+                </div>
               ) : (
                 <FormField control={form.control} name="employeeId" render={({ field }) => (
                   <FormItem><FormLabel>Assign to Employee</FormLabel>
