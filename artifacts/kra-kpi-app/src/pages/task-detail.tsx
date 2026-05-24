@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetTask, useListTaskComments, useAddTaskComment,
-  useUpdateTaskStatus, getGetTaskQueryKey, getListTaskCommentsQueryKey,
+  useUpdateTaskStatus, useUpdateTask, useDeleteTask,
+  useListEmployees, useListDepartments,
+  getGetTaskQueryKey, getListTaskCommentsQueryKey,
   getListTasksQueryKey, getGetPendingApprovalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,31 +18,68 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, CheckCircle2, Clock, Send, User, Building2,
   Calendar, Flag, MessageSquare, UserCheck,
+  Pencil, Trash2, MoreHorizontal, RefreshCw, Repeat,
 } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const statusColors: Record<string, string> = {
-  pending:              "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  in_progress:          "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  completed:            "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  delayed:              "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  approved:             "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-  rejected:             "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
-  awaiting_hod_approval:"bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  closed:               "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300",
+  pending:               "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  in_progress:           "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  completed:             "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  delayed:               "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  approved:              "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  rejected:              "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
+  awaiting_hod_approval: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  closed:                "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300",
 };
 const priorityColors: Record<string, string> = {
   high:   "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   low:    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
 };
+
+const PRIORITIES  = ["high", "medium", "low"] as const;
+const FREQS       = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
 const ASSIGNEE_STATUSES = ["in_progress", "completed", "delayed", "rejected"] as const;
+
+const QUICK_STATUSES: { status: string; label: string; color: string }[] = [
+  { status: "pending",     label: "Mark Pending",     color: "text-yellow-700 border-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-950/30" },
+  { status: "in_progress", label: "Mark In Progress", color: "text-blue-700 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30" },
+  { status: "delayed",     label: "Mark Delayed",     color: "text-red-700 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/30" },
+  { status: "completed",   label: "Mark Completed",   color: "text-green-700 border-green-300 hover:bg-green-50 dark:hover:bg-green-950/30" },
+  { status: "rejected",    label: "Mark Rejected",    color: "text-gray-700 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-950/30" },
+];
+
+// ── Task edit schema ───────────────────────────────────────────────────────────
+
+const taskSchema = z.object({
+  title:         z.string().min(1, "Title required"),
+  description:   z.string().optional(),
+  priority:      z.enum(PRIORITIES),
+  dueDate:       z.string().optional(),
+  createdById:   z.number({ required_error: "Creator required" }),
+  assignedToId:  z.number({ required_error: "Assignee required" }),
+  departmentId:  z.number({ required_error: "Department required" }),
+  isRecurring:   z.boolean().default(false),
+  recurringFreq: z.enum(FREQS).optional(),
+});
+type TaskFormData = z.infer<typeof taskSchema>;
 
 const commentSchema = z.object({ content: z.string().min(1, "Comment cannot be empty"), authorId: z.number() });
 type CommentForm = z.infer<typeof commentSchema>;
@@ -54,7 +93,7 @@ function StepIndicator({ n, state, label, sublabel }: { n: number; state: StepSt
     <div className="flex flex-col items-center gap-1.5 shrink-0">
       {state === "done" ? (
         <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center shadow ring-4 ring-emerald-100 dark:ring-emerald-900/40">
-          <CheckCircle2 className="h-4.5 w-4.5 text-white h-5 w-5" />
+          <CheckCircle2 className="h-5 w-5 text-white" />
         </div>
       ) : state === "active" ? (
         <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shadow ring-4 ring-primary/20">
@@ -76,9 +115,7 @@ function StepIndicator({ n, state, label, sublabel }: { n: number; state: StepSt
 }
 
 function StepConnector({ done }: { done: boolean }) {
-  return (
-    <div className={`flex-1 h-0.5 mx-2 mt-[-18px] mb-auto ${done ? "bg-emerald-400" : "bg-border"}`} />
-  );
+  return <div className={`flex-1 h-0.5 mx-2 mt-[-18px] mb-auto ${done ? "bg-emerald-400" : "bg-border"}`} />;
 }
 
 function StepCard({ state, header, children }: { state: StepState; header: React.ReactNode; children: React.ReactNode }) {
@@ -119,17 +156,32 @@ export default function TaskDetail() {
   const queryClient = useQueryClient();
 
   const taskId = Number(params.id);
+
   const { data: task, isLoading } = useGetTask(taskId, {
     query: { queryKey: getGetTaskQueryKey(taskId), staleTime: 0, refetchOnMount: "always" },
   });
   const { data: comments } = useListTaskComments(taskId, {
     query: { queryKey: getListTaskCommentsQueryKey(taskId) },
   });
+  const { data: employees }  = useListEmployees();
+  const { data: departments } = useListDepartments();
 
   const updateStatus = useUpdateTaskStatus();
+  const updateTask   = useUpdateTask();
+  const deleteTask   = useDeleteTask();
   const addComment   = useAddTaskComment();
 
   const [remarksInput, setRemarksInput] = useState("");
+  const [editOpen,   setEditOpen]   = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const editForm = useForm<TaskFormData>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: { isRecurring: false },
+  });
+  const isRecurring    = editForm.watch("isRecurring");
+  const selectedDeptId = editForm.watch("departmentId");
+  const deptEmployees  = employees?.filter((e) => selectedDeptId ? e.departmentId === selectedDeptId : true);
 
   const commentForm = useForm<CommentForm>({
     resolver: zodResolver(commentSchema),
@@ -149,6 +201,7 @@ export default function TaskDetail() {
   const isCreator  = task?.createdById  === user?.id;
   const isAssignee = task?.assignedToId === user?.id;
   const isHOD      = user?.role === "hod" || user?.role === "manager" || user?.role === "management" || user?.role === "admin";
+  const canManage  = user?.role !== "employee";
 
   const canApprove      = isHOD && !step2Done;
   const canUpdateStatus = step2Done && !step4Done && (isAssignee || isHOD);
@@ -164,13 +217,47 @@ export default function TaskDetail() {
   function changeStatus(status: string, opts?: { approverId?: number; approvalRemarks?: string }) {
     updateStatus.mutate(
       { id: taskId, data: { status: status as "approved" | "closed" | "pending" | "in_progress" | "completed" | "delayed" | "rejected" | "awaiting_hod_approval", approverId: opts?.approverId, approvalRemarks: opts?.approvalRemarks } },
-      { onSuccess: () => { invalidate(); toast({ title: "Status updated" }); } }
+      { onSuccess: () => { invalidate(); toast({ title: `Status changed to ${status.replace(/_/g, " ")}` }); } }
     );
   }
 
   function handleApprove() {
     changeStatus("approved", { approverId: user?.id, approvalRemarks: remarksInput || undefined });
     setRemarksInput("");
+  }
+
+  function openEdit() {
+    if (!task) return;
+    editForm.reset({
+      title:         task.title,
+      description:   task.description ?? "",
+      priority:      task.priority as typeof PRIORITIES[number],
+      dueDate:       task.dueDate ?? "",
+      createdById:   task.createdById,
+      assignedToId:  task.assignedToId,
+      departmentId:  task.departmentId,
+      isRecurring:   task.isRecurring ?? false,
+      recurringFreq: (task.recurringFreq as typeof FREQS[number] | undefined) ?? undefined,
+    });
+    setEditOpen(true);
+  }
+
+  function onSubmitEdit(values: TaskFormData) {
+    const payload = {
+      ...values,
+      description:   values.description   || undefined,
+      dueDate:       values.dueDate        || undefined,
+      recurringFreq: values.isRecurring ? values.recurringFreq : undefined,
+    };
+    updateTask.mutate({ id: taskId, data: payload }, {
+      onSuccess: () => { invalidate(); setEditOpen(false); toast({ title: "Task updated" }); },
+    });
+  }
+
+  function confirmDelete() {
+    deleteTask.mutate({ id: taskId }, {
+      onSuccess: () => { toast({ title: "Task deleted" }); navigate("/tasks"); },
+    });
   }
 
   function submitComment(values: CommentForm) {
@@ -211,34 +298,94 @@ export default function TaskDetail() {
     { n: 4, label: "Task Closed",    sublabel: "Accepted by Creator",  state: (step4Done ? "done" : currentStep === 4 ? "active" : "waiting") as StepState },
   ];
 
+  const quickStatusButtons = QUICK_STATUSES.filter((q) => q.status !== task.status && !step4Done);
+
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
+
+      {/* ── Sticky top bar ──────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground -ml-1"
+        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground -ml-1 shrink-0"
           onClick={() => navigate("/tasks")}>
           <ArrowLeft className="h-4 w-4" /> Back to Tasks
         </Button>
-        <div className="h-4 w-px bg-border" />
+        <div className="h-4 w-px bg-border shrink-0" />
         <span className="text-sm font-semibold truncate flex-1">{task.title}</span>
         <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize ${statusColors[task.status] ?? ""}`}>
           {task.status.replace(/_/g, " ")}
         </span>
+        {canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={openEdit}>
+                <Pencil className="mr-2 h-4 w-4" /> Edit Task
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Task
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-        {/* ── Title block ─────────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
+        {/* ── Title block ─────────────────────────────────────────────────────── */}
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-bold tracking-tight leading-snug">{task.title}</h1>
-              {task.description && (
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{task.description}</p>
+              {task.isRecurring && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  <Repeat className="h-3 w-3" /> Recurring
+                </span>
               )}
             </div>
+            {task.description && (
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{task.description}</p>
+            )}
           </div>
+          {canManage && (
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* ── Quick status actions (managers / HOD only) ───────────────────── */}
+        {canManage && !step4Done && quickStatusButtons.length > 0 && (
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" /> Quick Status Change
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {quickStatusButtons.map((q) => (
+                <Button
+                  key={q.status}
+                  variant="outline"
+                  size="sm"
+                  className={`text-xs font-medium capitalize ${q.color}`}
+                  disabled={updateStatus.isPending}
+                  onClick={() => changeStatus(q.status)}>
+                  {q.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── 4-Step progress tracker ─────────────────────────────────────── */}
         <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -543,9 +690,111 @@ export default function TaskDetail() {
           </div>
         </div>
 
-        {/* bottom padding */}
         <div className="h-4" />
       </div>
+
+      {/* ── Edit Dialog ───────────────────────────────────────────────────────── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
+              <FormField control={editForm.control} name="title" render={({ field }) => (
+                <FormItem><FormLabel>Title</FormLabel><FormControl><Input placeholder="Task title" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={editForm.control} name="description" render={({ field }) => (
+                <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the task…" rows={3} {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={editForm.control} name="departmentId" render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Department</FormLabel>
+                    <Select
+                      value={field.value?.toString() ?? ""}
+                      onValueChange={(v) => {
+                        field.onChange(Number(v));
+                        editForm.setValue("assignedToId", undefined as unknown as number);
+                      }}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                      <SelectContent>{departments?.map((d) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="assignedToId" render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Assign To</FormLabel>
+                    <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(Number(v))}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedDeptId ? "Select employee" : "Select a department first"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {deptEmployees?.length
+                          ? deptEmployees.map((e) => <SelectItem key={e.id} value={e.id.toString()}>{e.name}</SelectItem>)
+                          : <SelectItem value="none" disabled>No employees in this department</SelectItem>}
+                      </SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="priority" render={({ field }) => (
+                  <FormItem><FormLabel>Priority</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>{PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="dueDate" render={({ field }) => (
+                  <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <FormField control={editForm.control} name="isRecurring" render={({ field }) => (
+                <FormItem className="flex items-center gap-3 rounded-lg border p-3">
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} id="edit-is-recurring" /></FormControl>
+                  <Label htmlFor="edit-is-recurring" className="cursor-pointer">Recurring Task</Label>
+                </FormItem>
+              )} />
+              {isRecurring && (
+                <FormField control={editForm.control} name="recurringFreq" render={({ field }) => (
+                  <FormItem><FormLabel>Frequency</FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl>
+                      <SelectContent>{FREQS.map((f) => <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={updateTask.isPending}>Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation ───────────────────────────────────────────────── */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete <strong>{task.title}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteTask.isPending}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
