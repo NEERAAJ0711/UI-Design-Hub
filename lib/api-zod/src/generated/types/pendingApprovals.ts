@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CrossDeptTaskApproval } from './crossDeptTaskApproval';
+import type { HodPendingTaskApproval } from './hodPendingTaskApproval';
 import type { HrPendingKraApproval } from './hrPendingKraApproval';
 import type { PendingKraApproval } from './pendingKraApproval';
 import type { PendingTaskApproval } from './pendingTaskApproval';
@@ -15,4 +16,5 @@ export interface PendingApprovals {
   tasks: PendingTaskApproval[];
   krasPendingHrApproval: HrPendingKraApproval[];
   crossDeptTasks: CrossDeptTaskApproval[];
+  hodPendingTasks: HodPendingTaskApproval[];
 }

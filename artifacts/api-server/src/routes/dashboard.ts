@@ -230,6 +230,12 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
     if (departmentId && t.departmentId !== departmentId) return false;
     return true;
   });
+  // Same-dept tasks that are "pending" and haven't been approved by HOD yet
+  const hodPendingTasks = allTasks.filter((t) => {
+    if (t.status !== "pending" || t.approvedById) return false;
+    if (departmentId && t.departmentId !== departmentId) return false;
+    return true;
+  });
 
   const emps = await db.select({ id: employeesTable.id, name: employeesTable.name }).from(employeesTable);
   const empMap = new Map(emps.map((e) => [e.id, e.name]));
@@ -282,6 +288,16 @@ router.get("/dashboard/pending-approvals", async (req, res) => {
       };
     }),
     crossDeptTasks: crossDeptTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      assignedToName: empMap.get(t.assignedToId) ?? "",
+      createdByName: empMap.get(t.createdById) ?? "",
+      departmentName: deptMap.get(t.departmentId) ?? "",
+      priority: t.priority,
+      dueDate: t.dueDate ?? null,
+      createdAt: t.createdAt.toISOString(),
+    })),
+    hodPendingTasks: hodPendingTasks.map((t) => ({
       id: t.id,
       title: t.title,
       assignedToName: empMap.get(t.assignedToId) ?? "",

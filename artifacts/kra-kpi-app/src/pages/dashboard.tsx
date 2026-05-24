@@ -9,6 +9,7 @@ import {
   useGetPendingApprovals,
   useApproveKraClosure,
   useApproveTaskStatus,
+  useUpdateTaskStatus,
   getGetPendingApprovalsQueryKey,
   getListKrasQueryKey,
   getListTasksQueryKey,
@@ -184,10 +185,15 @@ function ManagerHodDashboard() {
   const { data: recentActivity } = useGetRecentActivity({ limit: 8 });
   const { data: taskBreakdown } = useGetTaskStatusBreakdown();
 
-  const approveKra = useApproveKraClosure();
+  const approveKra  = useApproveKraClosure();
   const approveTask = useApproveTaskStatus();
+  const updateTaskStatus = useUpdateTaskStatus();
 
-  const totalPending = (pendingData?.kras?.length ?? 0) + (pendingData?.tasks?.length ?? 0);
+  const totalPending =
+    (pendingData?.kras?.length ?? 0) +
+    (pendingData?.tasks?.length ?? 0) +
+    (pendingData?.crossDeptTasks?.length ?? 0) +
+    (pendingData?.hodPendingTasks?.length ?? 0);
 
   function handleKraApproval(id: number, approved: boolean) {
     approveKra.mutate({ id, data: { approved } }, {
@@ -207,6 +213,32 @@ function ManagerHodDashboard() {
         toast({ title: approved ? "Status change approved" : "Status change rejected" });
       },
     });
+  }
+
+  function handleHodApproval(id: number, approved: boolean) {
+    if (approved) {
+      updateTaskStatus.mutate(
+        { id, data: { status: "approved", approverId: user?.id } },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
+            queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+            toast({ title: "Task approved" });
+          },
+        }
+      );
+    } else {
+      updateTaskStatus.mutate(
+        { id, data: { status: "rejected" } },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey(approvalParams) });
+            queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+            toast({ title: "Task rejected" });
+          },
+        }
+      );
+    }
   }
 
   const roleLabel = user?.role === "hod" ? "HOD" : "Manager";
@@ -269,9 +301,76 @@ function ManagerHodDashboard() {
                   ))}
                 </div>
               )}
+              {/* ── Pending HOD Task Approvals (same-dept) ── */}
+              {(pendingData?.hodPendingTasks?.length ?? 0) > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Task Approvals</h4>
+                  {pendingData!.hodPendingTasks.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border mb-2 bg-card">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground">{task.assignedToName} · {task.departmentName}</p>
+                          {task.dueDate && <p className="text-xs text-muted-foreground">Due: {format(new Date(task.dueDate), "MMM d")}</p>}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize
+                            ${task.priority === "high" ? "bg-red-100 text-red-700" : task.priority === "medium" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            {task.priority}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Created by {task.createdByName}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4 shrink-0">
+                        <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleHodApproval(task.id, true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleHodApproval(task.id, false)}>
+                          <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Cross-dept Tasks Awaiting HOD Approval ── */}
+              {(pendingData?.crossDeptTasks?.length ?? 0) > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cross-Dept Task Approvals</h4>
+                  {pendingData!.crossDeptTasks.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border mb-2 bg-card">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground">{task.assignedToName} · {task.departmentName}</p>
+                          {task.dueDate && <p className="text-xs text-muted-foreground">Due: {format(new Date(task.dueDate), "MMM d")}</p>}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize
+                            ${task.priority === "high" ? "bg-red-100 text-red-700" : task.priority === "medium" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            {task.priority}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Created by {task.createdByName}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4 shrink-0">
+                        <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleHodApproval(task.id, true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleHodApproval(task.id, false)}>
+                          <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Employee Status Change Requests ── */}
               {(pendingData?.tasks?.length ?? 0) > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Task Status Requests</h4>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status Change Requests</h4>
                   {pendingData!.tasks.map((task) => (
                     <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border mb-2 bg-card">
                       <div className="flex-1 min-w-0">
@@ -282,7 +381,7 @@ function ManagerHodDashboard() {
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="text-xs text-muted-foreground">Current: <strong>{task.status}</strong></span>
                           <span className="text-xs text-muted-foreground">→</span>
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{task.requestedStatus}</span>
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full capitalize">{task.requestedStatus.replace(/_/g, " ")}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4 shrink-0">

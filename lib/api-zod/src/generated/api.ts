@@ -1302,6 +1302,16 @@ export const GetPendingApprovalsResponse = zod.object({
   "priority": zod.string(),
   "dueDate": zod.string().nullish(),
   "createdAt": zod.string()
+})),
+  "hodPendingTasks": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "assignedToName": zod.string(),
+  "createdByName": zod.string(),
+  "departmentName": zod.string(),
+  "priority": zod.string(),
+  "dueDate": zod.string().nullish(),
+  "createdAt": zod.string()
 }))
 })
 

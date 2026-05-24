@@ -1838,9 +1838,22 @@ components:
         dueDate:        { type: ["string", "null"] }
         createdAt:      { type: string }
 
+    HodPendingTaskApproval:
+      type: object
+      required: [id, title, assignedToName, createdByName, departmentName, priority, createdAt]
+      properties:
+        id:             { type: integer }
+        title:          { type: string }
+        assignedToName: { type: string }
+        createdByName:  { type: string }
+        departmentName: { type: string }
+        priority:       { type: string }
+        dueDate:        { type: ["string", "null"] }
+        createdAt:      { type: string }
+
     PendingApprovals:
       type: object
-      required: [kras, tasks, krasPendingHrApproval, crossDeptTasks]
+      required: [kras, tasks, krasPendingHrApproval, crossDeptTasks, hodPendingTasks]
       properties:
         kras:
           type: array
@@ -1858,6 +1871,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CrossDeptTaskApproval"
+        hodPendingTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/HodPendingTaskApproval"
 
     Holiday:
       type: object

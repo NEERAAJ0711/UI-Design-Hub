@@ -721,11 +721,24 @@ export interface CrossDeptTaskApproval {
   createdAt: string;
 }
 
+export interface HodPendingTaskApproval {
+  id: number;
+  title: string;
+  assignedToName: string;
+  createdByName: string;
+  departmentName: string;
+  priority: string;
+  /** @nullable */
+  dueDate?: string | null;
+  createdAt: string;
+}
+
 export interface PendingApprovals {
   kras: PendingKraApproval[];
   tasks: PendingTaskApproval[];
   krasPendingHrApproval: HrPendingKraApproval[];
   crossDeptTasks: CrossDeptTaskApproval[];
+  hodPendingTasks: HodPendingTaskApproval[];
 }
 
 export interface Holiday {

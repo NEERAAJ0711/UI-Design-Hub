@@ -42,6 +42,7 @@ export * from './getPendingApprovalsParams';
 export * from './getRecentActivityParams';
 export * from './getTopPerformersParams';
 export * from './healthStatus';
+export * from './hodPendingTaskApproval';
 export * from './holiday';
 export * from './holidayInput';
 export * from './hrApproveKraInput';
