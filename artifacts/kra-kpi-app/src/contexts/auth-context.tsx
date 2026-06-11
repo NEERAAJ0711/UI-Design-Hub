@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Extract cleaner message from API error
       const match = msg.match(/: (.+)$/);
       setError(match ? match[1] : msg);
-      throw err;
     }
   }, [loginMutation]);
 
