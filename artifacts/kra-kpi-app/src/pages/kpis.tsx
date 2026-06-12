@@ -205,11 +205,11 @@ export default function KPIs() {
               <TableRow>
                 {!isEmployee && <TableHead>Employee</TableHead>}
                 <TableHead>Period</TableHead>
-                <TableHead className="text-right">KRA (40%)</TableHead>
-                <TableHead className="text-right">Tasks (30%)</TableHead>
-                <TableHead className="text-right">Prod (15%)</TableHead>
-                <TableHead className="text-right">Punct (10%)</TableHead>
-                <TableHead className="text-right">Disc (5%)</TableHead>
+                <TableHead className="text-right">KRA ({w.kraWeight}%)</TableHead>
+                <TableHead className="text-right">Tasks ({w.taskCompletionWeight}%)</TableHead>
+                <TableHead className="text-right">Prod ({w.productivityWeight}%)</TableHead>
+                <TableHead className="text-right">Punct ({w.punctualityWeight}%)</TableHead>
+                <TableHead className="text-right">Disc ({w.disciplineWeight}%)</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Rating</TableHead>
                 {!isEmployee && <TableHead className="text-right">Actions</TableHead>}
