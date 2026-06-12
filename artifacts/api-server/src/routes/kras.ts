@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, krasTable, departmentsTable, employeesTable, activityLogTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, krasTable, departmentsTable, employeesTable, activityLogTable, kpisTable, tasksTable, scoreWeightsTable } from "@workspace/db";
+import { eq, and, ne } from "drizzle-orm";
 import {
   CreateKraBody,
   UpdateKraBody,
@@ -119,6 +119,59 @@ router.patch("/kras/:id/score", async (req, res) => {
     entityId: kra.id,
     entityType: "kra",
   });
+
+  // Auto-recalculate KPI for this employee when a KRA score changes
+  if (kra.employeeId) {
+    try {
+      const employeeId = kra.employeeId;
+      const month = new Date().getMonth() + 1;
+      const year  = new Date().getFullYear();
+
+      const [weightsRow] = await db.select().from(scoreWeightsTable);
+      const w = weightsRow ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+
+      const [empKras, tasks, [existingKpi]] = await Promise.all([
+        db.select({ achievementPct: krasTable.achievementPct, weightage: krasTable.weightage })
+          .from(krasTable)
+          .where(and(eq(krasTable.employeeId, employeeId), ne(krasTable.hrApprovalStatus, "hr_rejected"))),
+        db.select({ status: tasksTable.status })
+          .from(tasksTable)
+          .where(eq(tasksTable.assignedToId, employeeId)),
+        db.select().from(kpisTable)
+          .where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
+      ]);
+
+      const totalWeightage = empKras.reduce((s, k) => s + k.weightage, 0);
+      let kraAchievement: number;
+      if (totalWeightage === 0) {
+        const scored = empKras.filter((k) => k.achievementPct != null);
+        kraAchievement = scored.length ? Math.round((scored.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / scored.length) * 10) / 10 : 0;
+      } else {
+        kraAchievement = Math.round((empKras.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0) / totalWeightage) * 10) / 10;
+      }
+
+      const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
+      const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
+      const productivity = existingKpi?.productivity ?? 0;
+      const punctuality  = existingKpi?.punctuality ?? 0;
+      const discipline   = existingKpi?.discipline ?? 0;
+
+      const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
+      const raw = kraAchievement * w.kraWeight + taskCompletion * w.taskCompletionWeight
+                + productivity * w.productivityWeight + punctuality * w.punctualityWeight + discipline * w.disciplineWeight;
+      const totalScore = Math.round((raw / (totalWeight || 100)) * 10) / 10;
+
+      await db.insert(kpisTable)
+        .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+        .onConflictDoUpdate({
+          target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
+          set: { kraAchievement, taskCompletion, totalScore },
+        });
+    } catch {
+      // KPI recalculation is non-critical
+    }
+  }
+
   res.json(await enrichKra(kra));
 });
 

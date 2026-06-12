@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, kpisTable, krasTable, tasksTable, scoreWeightsTable, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import {
   CreateKpiBody,
   UpdateKpiBody,
@@ -200,7 +200,7 @@ router.post("/kpis/calculate-batch", async (req, res) => {
   const [allEmployees, w, allKras, allTasks, allExisting] = await Promise.all([
     db.select({ id: employeesTable.id }).from(employeesTable),
     getWeights(),
-    db.select().from(krasTable).where(eq(krasTable.hrApprovalStatus, "hr_approved")),
+    db.select().from(krasTable).where(ne(krasTable.hrApprovalStatus, "hr_rejected")),
     db.select().from(tasksTable),
     db.select().from(kpisTable).where(and(eq(kpisTable.month, month), eq(kpisTable.year, year))),
   ]);
@@ -246,7 +246,7 @@ router.post("/kpis/calculate", async (req, res) => {
 
   const [w, kras, tasks, [existing]] = await Promise.all([
     getWeights(),
-    db.select().from(krasTable).where(and(eq(krasTable.employeeId, employeeId), eq(krasTable.hrApprovalStatus, "hr_approved"))),
+    db.select().from(krasTable).where(and(eq(krasTable.employeeId, employeeId), ne(krasTable.hrApprovalStatus, "hr_rejected"))),
     db.select().from(tasksTable).where(eq(tasksTable.assignedToId, employeeId)),
     db.select().from(kpisTable).where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
   ]);

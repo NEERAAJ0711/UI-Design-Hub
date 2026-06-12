@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Star } from "lucide-react";
+import { MoreHorizontal, Trash2, Star, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
@@ -74,29 +74,28 @@ export default function KPIs() {
 
   const w = scoreWeights ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
 
-  // Auto-calculate & save KPI scores for all employees once per browser session.
-  // sessionStorage persists across component remounts so navigating away and
-  // back does NOT trigger a second batch run (which previously caused duplicates).
-  useEffect(() => {
-    const SESSION_KEY = "kpi_batch_calced";
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  async function runBatchCalculate(silent = false) {
     const month = new Date().getMonth() + 1;
     const year = new Date().getFullYear();
-    const sessionToken = `${year}-${month}`;
+    try {
+      setIsRecalculating(true);
+      const { saved } = await calculateKpiBatchAsync({ data: { month, year } });
+      queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
+      if (!silent) toast({ title: `KPI scores recalculated for ${saved} employee(s)` });
+    } catch {
+      if (!silent) toast({ title: "Score recalculation failed", variant: "destructive" });
+    } finally {
+      setIsRecalculating(false);
+    }
+  }
 
+  // Auto-calculate KPI scores on every page visit (batch is idempotent — uses upsert).
+  useEffect(() => {
     if (isEmployee || hasAutoCalced.current) return;
-    if (sessionStorage.getItem(SESSION_KEY) === sessionToken) return;
-
     hasAutoCalced.current = true;
-    sessionStorage.setItem(SESSION_KEY, sessionToken);
-
-    calculateKpiBatchAsync({ data: { month, year } })
-      .then(({ saved }) => {
-        if (saved > 0) {
-          queryClient.invalidateQueries({ queryKey: getListKpisQueryKey(kpiParams) });
-          toast({ title: `KPI scores refreshed for ${saved} employee(s)` });
-        }
-      })
-      .catch(() => { /* silent — batch failures are non-critical */ });
+    runBatchCalculate(true);
   }, [isEmployee]);
 
   function confirmDelete() {
@@ -122,7 +121,16 @@ export default function KPIs() {
           </p>
         </div>
         {!isEmployee && (
-          <p className="text-xs text-muted-foreground">Scores auto-calculated from KRA &amp; Task records</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => runBatchCalculate(false)}
+            disabled={isRecalculating}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRecalculating ? "animate-spin" : ""}`} />
+            {isRecalculating ? "Recalculating…" : "Recalculate Scores"}
+          </Button>
         )}
       </div>
 

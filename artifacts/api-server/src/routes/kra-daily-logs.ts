@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, kraDailyLogsTable, krasTable, holidaysTable } from "@workspace/db";
-import { eq, and, gte, lte, between } from "drizzle-orm";
+import { db, kraDailyLogsTable, krasTable, holidaysTable, kpisTable, tasksTable, scoreWeightsTable, employeesTable } from "@workspace/db";
+import { eq, and, gte, lte, between, ne } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const router = Router();
@@ -123,6 +123,56 @@ router.post("/kra-daily-logs/check-in", async (req, res) => {
   // Recalculate and store achievementPct on the KRA
   const achievementPct = await recalcDailyAchievement(body.kraId, body.employeeId);
   await db.update(krasTable).set({ achievementPct }).where(eq(krasTable.id, body.kraId));
+
+  // Also auto-recalculate the KPI score for this employee for the current month
+  try {
+    const month = new Date().getMonth() + 1;
+    const year  = new Date().getFullYear();
+
+    const [weightsRow] = await db.select().from(scoreWeightsTable);
+    const w = weightsRow ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+
+    const [empKras, tasks, [existingKpi]] = await Promise.all([
+      db.select({ achievementPct: krasTable.achievementPct, weightage: krasTable.weightage })
+        .from(krasTable)
+        .where(and(eq(krasTable.employeeId, body.employeeId), ne(krasTable.hrApprovalStatus, "hr_rejected"))),
+      db.select({ status: tasksTable.status })
+        .from(tasksTable)
+        .where(eq(tasksTable.assignedToId, body.employeeId)),
+      db.select().from(kpisTable)
+        .where(and(eq(kpisTable.employeeId, body.employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
+    ]);
+
+    const totalWeightage = empKras.reduce((s, k) => s + k.weightage, 0);
+    let kraAchievement: number;
+    if (totalWeightage === 0) {
+      const scored = empKras.filter((k) => k.achievementPct != null);
+      kraAchievement = scored.length ? Math.round((scored.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / scored.length) * 10) / 10 : 0;
+    } else {
+      kraAchievement = Math.round((empKras.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0) / totalWeightage) * 10) / 10;
+    }
+
+    const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
+    const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
+
+    const productivity = existingKpi?.productivity ?? 0;
+    const punctuality  = existingKpi?.punctuality ?? 0;
+    const discipline   = existingKpi?.discipline ?? 0;
+
+    const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
+    const raw = kraAchievement * w.kraWeight + taskCompletion * w.taskCompletionWeight
+              + productivity * w.productivityWeight + punctuality * w.punctualityWeight + discipline * w.disciplineWeight;
+    const totalScore = Math.round((raw / (totalWeight || 100)) * 10) / 10;
+
+    await db.insert(kpisTable)
+      .values({ employeeId: body.employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+      .onConflictDoUpdate({
+        target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
+        set: { kraAchievement, taskCompletion, totalScore },
+      });
+  } catch {
+    // KPI recalculation failure is non-critical — check-in is still saved
+  }
 
   res.json({
     ...log,
