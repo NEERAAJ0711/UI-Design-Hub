@@ -6,12 +6,11 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2, ShieldAlert, Building2, Users, BarChart3, Target } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
-  { role: "System Admin", email: "admin@company.com", label: "System Admin", isAdmin: true },
-  { role: "Management", email: "rajan.mehta@company.com", label: "Rajan Mehta", isAdmin: false },
-  { role: "HOD (HR)", email: "priya.sharma@company.com", label: "Priya Sharma", isAdmin: false },
-  { role: "HOD (IT)", email: "anil.kumar@company.com", label: "Anil Kumar", isAdmin: false },
-  { role: "Manager", email: "sunita.verma@company.com", label: "Sunita Verma", isAdmin: false },
-  { role: "Employee", email: "kavita.joshi@company.com", label: "Kavita Joshi", isAdmin: false },
+  { role: "Management", email: "admin@rpsgroup.com", label: "Admin User", isAdmin: false },
+  { role: "HOD Engineering", email: "hod.engineering@rpsgroup.com", label: "Priya Sharma", isAdmin: false },
+  { role: "Manager", email: "manager.eng@rpsgroup.com", label: "Rahul Verma", isAdmin: false },
+  { role: "Employee", email: "employee@rpsgroup.com", label: "Amit Kumar", isAdmin: false },
+  { role: "HOD HR", email: "hod.hr@rpsgroup.com", label: "Sunita Patel", isAdmin: false },
 ];
 
 const HIGHLIGHTS = [

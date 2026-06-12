@@ -152,6 +152,11 @@ router.get("/dashboard/recent-activity", async (req, res) => {
   })));
 });
 
+// Alias: /dashboard/employee/:id → /dashboard/employee-summary?employeeId=:id
+router.get("/dashboard/employee/:id", (req, res) => {
+  res.redirect(`/api/dashboard/employee-summary?employeeId=${req.params.id}`);
+});
+
 router.get("/dashboard/employee-summary", async (req, res) => {
   const { employeeId } = GetEmployeeDashboardSummaryQueryParams.parse(req.query);
   const today = new Date().toISOString().split("T")[0];
