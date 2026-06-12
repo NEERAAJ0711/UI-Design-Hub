@@ -16,7 +16,7 @@ import { z } from "zod";
 const BulkEmployeeRowSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(["management", "hod", "manager", "employee"]).default("employee"),
+  role: z.enum(["admin", "management", "hod", "manager", "employee"]).default("employee"),
   department: z.string().min(1),
   designation: z.string().optional(),
   company: z.string().optional(),

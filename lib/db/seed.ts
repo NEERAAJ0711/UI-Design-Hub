@@ -137,9 +137,25 @@ async function seed() {
     })
     .onConflictDoNothing();
 
+  // System Admin
+  await db
+    .insert(employeesTable)
+    .values({
+      name: "System Administrator",
+      email: "sysadmin@rpsgroup.com",
+      passwordHash: password,
+      role: "admin",
+      designation: "System Administrator",
+      company: "RPS Infrastructure Limited",
+      departmentId: deptMap["IT"]!,
+      mustChangePassword: false,
+    })
+    .onConflictDoNothing();
+
   console.log("Seed complete!");
   console.log("");
   console.log("Demo accounts (all use password: Password@123)");
+  console.log("  sysadmin@rpsgroup.com      — System Admin");
   console.log("  admin@rpsgroup.com         — Management (Admin)");
   console.log("  hod.engineering@rpsgroup.com — HOD Engineering");
   console.log("  manager.eng@rpsgroup.com   — Manager Engineering");

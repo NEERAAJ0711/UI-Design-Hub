@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2, ShieldAlert, Building2, Users, BarChart3, Target } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
+  { role: "System Admin", email: "sysadmin@rpsgroup.com", label: "System Administrator", isAdmin: true },
   { role: "Management", email: "admin@rpsgroup.com", label: "Admin User", isAdmin: false },
   { role: "HOD Engineering", email: "hod.engineering@rpsgroup.com", label: "Priya Sharma", isAdmin: false },
   { role: "Manager", email: "manager.eng@rpsgroup.com", label: "Rahul Verma", isAdmin: false },
