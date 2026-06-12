@@ -10,7 +10,6 @@ import {
   useGetPendingApprovals,
   useGetRecentActivity,
   useApproveKraClosure,
-  useApproveTaskStatus,
   useListDesignations,
   useCreateDesignation,
   useUpdateDesignation,
@@ -32,7 +31,6 @@ import {
   getListHolidaysQueryKey,
   getGetScoreWeightsQueryKey,
   getListKrasQueryKey,
-  getListTasksQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -46,7 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  ShieldAlert, Users, Building2, CheckSquare, Target, Bell, CheckCircle2, XCircle,
+  ShieldAlert, Users, Building2, Target, Bell, CheckCircle2, XCircle,
   Activity, RefreshCw, Plus, Pencil, Trash2, Briefcase, LayoutList,
   Settings, CalendarDays, Clock, AlertTriangle,
 } from "lucide-react";
@@ -204,7 +202,6 @@ export default function Admin() {
 
   const updateEmployee = useUpdateEmployee();
   const approveKra = useApproveKraClosure();
-  const approveTask = useApproveTaskStatus();
   const createHolidayMut = useCreateHoliday();
   const deleteHolidayMut = useDeleteHoliday();
   const updateWeightsMut = useUpdateScoreWeights();
@@ -232,19 +229,15 @@ export default function Admin() {
   const [holidayName, setHolidayName] = useState("");
 
   // Score weights form state (init from server data when loaded)
-  const [wKra, setWKra] = useState<number>(40);
-  const [wTask, setWTask] = useState<number>(30);
-  const [wProd, setWProd] = useState<number>(15);
-  const [wPunct, setWPunct] = useState<number>(10);
-  const [wDisc, setWDisc] = useState<number>(5);
-  const weightsTotal = wKra + wTask + wProd + wPunct + wDisc;
+  const [wKra, setWKra] = useState<number>(70);
+  const [wPunct, setWPunct] = useState<number>(20);
+  const [wDisc, setWDisc] = useState<number>(10);
+  const weightsTotal = wKra + wPunct + wDisc;
 
   // Sync weights form from server when data loads
   useEffect(() => {
     if (scoreWeights) {
       setWKra(scoreWeights.kraWeight);
-      setWTask(scoreWeights.taskCompletionWeight);
-      setWProd(scoreWeights.productivityWeight);
       setWPunct(scoreWeights.punctualityWeight);
       setWDisc(scoreWeights.disciplineWeight);
     }
@@ -258,7 +251,7 @@ export default function Admin() {
   const [deptDeleteTarget, setDeptDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const deptMap = new Map((departments ?? []).map((d) => [d.id, d.name]));
-  const totalPending = (pendingData?.kras?.length ?? 0) + (pendingData?.tasks?.length ?? 0);
+  const totalPending = (pendingData?.kras?.length ?? 0);
 
   function confirmRoleChange() {
     if (!roleChangeTarget) return;
@@ -283,16 +276,6 @@ export default function Admin() {
         queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getListKrasQueryKey() });
         toast({ title: approved ? "KRA approved" : "KRA rejected" });
-      },
-    });
-  }
-
-  function handleTaskApproval(id: number, approved: boolean) {
-    approveTask.mutate({ id, data: { approved } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetPendingApprovalsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-        toast({ title: approved ? "Status change approved" : "Status change rejected" });
       },
     });
   }
@@ -383,10 +366,9 @@ export default function Admin() {
       </div>
 
       {/* System Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<Users className="h-4 w-4" />} title="Total Users" value={summary?.totalEmployees} loading={loadingSummary} />
         <StatCard icon={<Building2 className="h-4 w-4" />} title="Departments" value={departments?.length ?? summary?.totalDepartments} loading={loadingSummary} />
-        <StatCard icon={<CheckSquare className="h-4 w-4" />} title="Total Tasks" value={summary?.totalTasks} loading={loadingSummary} />
         <StatCard icon={<Target className="h-4 w-4" />} title="Avg KPI Score" value={summary?.avgKpiScore?.toFixed(1) ?? "—"} loading={loadingSummary} />
         <StatCard
           icon={<Bell className={`h-4 w-4 ${totalPending > 0 ? "text-orange-500" : ""}`} />}
@@ -588,7 +570,7 @@ export default function Admin() {
                 <Bell className="h-5 w-5 text-orange-500" /> Company-wide Pending Approvals
                 {totalPending > 0 && <Badge className="bg-orange-500 text-white">{totalPending}</Badge>}
               </CardTitle>
-              <CardDescription>All pending KRA closure requests and task status changes across every department.</CardDescription>
+              <CardDescription>All pending KRA closure requests across every department.</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingPending ? (
@@ -631,42 +613,6 @@ export default function Admin() {
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                               </Button>
                               <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 h-8" onClick={() => handleKraApproval(kra.id, false)}>
-                                <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {(pendingData?.tasks?.length ?? 0) > 0 && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        Task Status Requests ({pendingData!.tasks.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {pendingData!.tasks.map((task) => (
-                          <div key={task.id} className={`flex items-center justify-between p-3 rounded-lg border bg-card ${task.isOverdue ? "border-red-200 dark:border-red-900/50" : ""}`}>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{task.title}</p>
-                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <p className="text-xs text-muted-foreground">{task.assignedToName} · {task.departmentName}</p>
-                                <span className="text-xs font-medium">{task.status}</span>
-                                <span className="text-xs text-muted-foreground">→</span>
-                                <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">{task.requestedStatus}</span>
-                                {task.workingHoursElapsed > 0 && (
-                                  <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${task.isOverdue ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"}`}>
-                                    {task.isOverdue ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                    {task.workingHoursElapsed.toFixed(1)}h{task.isOverdue ? " — OVERDUE" : " elapsed"}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 ml-4 shrink-0">
-                              <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50 h-8" onClick={() => handleTaskApproval(task.id, true)}>
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 h-8" onClick={() => handleTaskApproval(task.id, false)}>
                                 <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
                               </Button>
                             </div>
@@ -731,8 +677,6 @@ export default function Admin() {
                 <div className="space-y-5 max-w-lg">
                   {[
                     { label: "KRA Achievement", value: wKra, setter: setWKra, hint: "Based on avg. achievement % of assigned KRAs" },
-                    { label: "Task Completion", value: wTask, setter: setWTask, hint: "% of tasks completed or approved" },
-                    { label: "Productivity", value: wProd, setter: setWProd, hint: "Manually assessed by manager" },
                     { label: "Punctuality", value: wPunct, setter: setWPunct, hint: "Manually assessed by manager" },
                     { label: "Discipline", value: wDisc, setter: setWDisc, hint: "Manually assessed by manager" },
                   ].map(({ label, value, setter, hint }) => (
@@ -768,8 +712,6 @@ export default function Admin() {
                       onClick={() => {
                         if (scoreWeights) {
                           setWKra(scoreWeights.kraWeight);
-                          setWTask(scoreWeights.taskCompletionWeight);
-                          setWProd(scoreWeights.productivityWeight);
                           setWPunct(scoreWeights.punctualityWeight);
                           setWDisc(scoreWeights.disciplineWeight);
                         }
@@ -785,8 +727,6 @@ export default function Admin() {
                         updateWeightsMut.mutate({
                           data: {
                             kraWeight: wKra,
-                            taskCompletionWeight: wTask,
-                            productivityWeight: wProd,
                             punctualityWeight: wPunct,
                             disciplineWeight: wDisc,
                           },
@@ -976,8 +916,6 @@ function StatCard({ icon, title, value, loading, valueClass }: {
 
 function ActivityDot({ type }: { type: string }) {
   const colors: Record<string, string> = {
-    task_created: "bg-blue-500", task_completed: "bg-green-500", task_delayed: "bg-red-500",
-    task_status_requested: "bg-yellow-500", task_status_approved: "bg-green-400", task_status_rejected: "bg-red-400",
     kra_submitted: "bg-yellow-500", kra_approved: "bg-green-500", kra_rejected: "bg-red-500",
     kra_scored: "bg-blue-400", kpi_created: "bg-purple-500", employee_created: "bg-indigo-500",
   };

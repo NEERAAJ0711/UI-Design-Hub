@@ -205,11 +205,9 @@ export default function KPIs() {
               <TableRow>
                 {!isEmployee && <TableHead>Employee</TableHead>}
                 <TableHead>Period</TableHead>
-                <TableHead className="text-right">KRA ({w.kraWeight}%)</TableHead>
-                <TableHead className="text-right">Tasks ({w.taskCompletionWeight}%)</TableHead>
-                <TableHead className="text-right">Prod ({w.productivityWeight}%)</TableHead>
-                <TableHead className="text-right">Punct ({w.punctualityWeight}%)</TableHead>
-                <TableHead className="text-right">Disc ({w.disciplineWeight}%)</TableHead>
+                <TableHead className="text-right">KRA Achievement ({w.kraWeight}%)</TableHead>
+                <TableHead className="text-right">Punctuality ({w.punctualityWeight}%)</TableHead>
+                <TableHead className="text-right">Discipline ({w.disciplineWeight}%)</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Rating</TableHead>
                 {!isEmployee && <TableHead className="text-right">Actions</TableHead>}
@@ -219,7 +217,7 @@ export default function KPIs() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: isEmployee ? 8 : 10 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                    {Array.from({ length: isEmployee ? 6 : 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                   </TableRow>
                 ))
               ) : filtered?.length ? (
@@ -234,8 +232,6 @@ export default function KPIs() {
                       )}
                       <TableCell>{format(new Date(kpi.year, kpi.month - 1), "MMM yyyy")}</TableCell>
                       <TableCell className="text-right">{kpi.kraAchievement}%</TableCell>
-                      <TableCell className="text-right">{kpi.taskCompletion}%</TableCell>
-                      <TableCell className="text-right">{kpi.productivity}%</TableCell>
                       <TableCell className="text-right">{kpi.punctuality}%</TableCell>
                       <TableCell className="text-right">{kpi.discipline}%</TableCell>
                       <TableCell className="text-right font-bold text-primary">{kpi.totalScore.toFixed(1)}</TableCell>
@@ -261,7 +257,7 @@ export default function KPIs() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={isEmployee ? 8 : 10} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={isEmployee ? 6 : 8} className="h-24 text-center text-muted-foreground">
                     {isEmployee ? "No KPI evaluations on record yet." : "No KPI records found."}
                   </TableCell>
                 </TableRow>

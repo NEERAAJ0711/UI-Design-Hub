@@ -18,7 +18,7 @@ const HIGHLIGHTS = [
   { icon: Users, label: "250+ Employees", sub: "Across 11 departments" },
   { icon: Target, label: "KRA Tracking", sub: "Key Result Areas" },
   { icon: BarChart3, label: "KPI Analytics", sub: "Performance indicators" },
-  { icon: Building2, label: "Multi-dept Tasks", sub: "Cross-team collaboration" },
+  { icon: Building2, label: "Multi-Dept Teams", sub: "Cross-team performance" },
 ];
 
 export default function Login() {
@@ -91,10 +91,10 @@ export default function Login() {
           <div className="mt-8">
             <p className="text-white/60 text-xs uppercase tracking-widest font-semibold mb-1">Enterprise Management Portal</p>
             <h2 className="text-2xl font-bold text-white">
-              KRA, KPI &amp; Task<br />Management System
+              KRA &amp; KPI<br />Management System
             </h2>
             <p className="mt-3 text-blue-200/80 text-sm leading-relaxed max-w-sm">
-              A centralised platform to track Key Result Areas, monitor KPIs, assign and manage tasks across all departments and teams.
+              A centralised platform to track Key Result Areas, monitor KPIs, and measure employee performance across all departments.
             </p>
           </div>
 

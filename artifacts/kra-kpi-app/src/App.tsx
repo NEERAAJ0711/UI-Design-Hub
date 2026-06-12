@@ -7,8 +7,6 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import Dashboard from "@/pages/dashboard";
 // Departments page removed — managed via System Admin > Masters tab
 import Employees from "@/pages/employees";
-import Tasks from "@/pages/tasks";
-import TaskDetail from "@/pages/task-detail";
 import KRAs from "@/pages/kras";
 import KPIs from "@/pages/kpis";
 import Admin from "@/pages/admin";
@@ -58,8 +56,6 @@ function ProtectedRoutes() {
         {isManagerOrAbove(user.role) && (
           <Route path="/employees" component={Employees} />
         )}
-        <Route path="/tasks" component={Tasks} />
-        <Route path="/tasks/:id" component={TaskDetail} />
         <Route path="/kras" component={KRAs} />
         {isManagerOrAbove(user.role) && (
           <Route path="/kpis" component={KPIs} />

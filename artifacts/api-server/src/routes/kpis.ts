@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, kpisTable, krasTable, tasksTable, scoreWeightsTable, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
+import { db, kpisTable, krasTable, scoreWeightsTable, employeesTable, departmentsTable, activityLogTable } from "@workspace/db";
 import { eq, and, ne } from "drizzle-orm";
 import {
   CreateKpiBody,
@@ -26,45 +26,42 @@ function calcRating(score: number): string {
 
 type Weights = {
   kraWeight: number;
-  taskCompletionWeight: number;
-  productivityWeight: number;
   punctualityWeight: number;
   disciplineWeight: number;
 };
 
 const DEFAULT_WEIGHTS: Weights = {
-  kraWeight: 40,
-  taskCompletionWeight: 30,
-  productivityWeight: 15,
-  punctualityWeight: 10,
-  disciplineWeight: 5,
+  kraWeight: 70,
+  punctualityWeight: 20,
+  disciplineWeight: 10,
 };
 
 async function getWeights(): Promise<Weights> {
   const [row] = await db.select().from(scoreWeightsTable);
-  return row ?? DEFAULT_WEIGHTS;
+  if (!row) return DEFAULT_WEIGHTS;
+  return {
+    kraWeight: row.kraWeight,
+    punctualityWeight: row.punctualityWeight,
+    disciplineWeight: row.disciplineWeight,
+  };
 }
 
 /**
- * Compute totalScore from component scores and configured weights.
+ * Compute totalScore from 3 component scores and configured weights.
  * Both component scores and weights are in percentage points (0-100).
  * totalScore = Σ(component × weight) / Σ(weights)
  */
 function calcTotalScore(
   components: {
     kraAchievement: number;
-    taskCompletion: number;
-    productivity: number;
     punctuality: number;
     discipline: number;
   },
   w: Weights
 ): number {
-  const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
+  const totalWeight = w.kraWeight + w.punctualityWeight + w.disciplineWeight;
   const raw =
     components.kraAchievement * w.kraWeight +
-    components.taskCompletion * w.taskCompletionWeight +
-    components.productivity * w.productivityWeight +
     components.punctuality * w.punctualityWeight +
     components.discipline * w.disciplineWeight;
   return Math.round((raw / (totalWeight || 100)) * 10) / 10;
@@ -198,11 +195,10 @@ router.post("/kpis/calculate-batch", async (req, res) => {
     res.status(400).json({ error: "month and year are required" }); return;
   }
 
-  const [allEmployees, w, allKras, allTasks, allExisting] = await Promise.all([
+  const [allEmployees, w, allKras, allExisting] = await Promise.all([
     db.select({ id: employeesTable.id }).from(employeesTable),
     getWeights(),
     db.select().from(krasTable).where(ne(krasTable.hrApprovalStatus, "hr_rejected")),
-    db.select().from(tasksTable),
     db.select().from(kpisTable).where(and(eq(kpisTable.month, month), eq(kpisTable.year, year))),
   ]);
 
@@ -211,25 +207,19 @@ router.post("/kpis/calculate-batch", async (req, res) => {
   let saved = 0;
   for (const emp of allEmployees) {
     const empKras = allKras.filter((k) => k.employeeId === emp.id);
-    // Weighted KRA achievement: uses each KRA's own weightage field
     const kraAchievement = calcKraAchievement(empKras);
 
-    const tasks = allTasks.filter((t) => t.assignedToId === emp.id);
-    const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
-    const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
-
     const existing = existingMap.get(emp.id);
-    const productivity = existing?.productivity ?? 0;
-    const punctuality  = existing?.punctuality ?? 0;
-    const discipline   = existing?.discipline ?? 0;
+    const punctuality = existing?.punctuality ?? 0;
+    const discipline  = existing?.discipline ?? 0;
 
-    const totalScore = calcTotalScore({ kraAchievement, taskCompletion, productivity, punctuality, discipline }, w);
+    const totalScore = calcTotalScore({ kraAchievement, punctuality, discipline }, w);
 
     await db.insert(kpisTable)
-      .values({ employeeId: emp.id, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+      .values({ employeeId: emp.id, month, year, kraAchievement, taskCompletion: 0, productivity: 0, punctuality, discipline, totalScore })
       .onConflictDoUpdate({
         target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
-        set: { kraAchievement, taskCompletion, totalScore },
+        set: { kraAchievement, taskCompletion: 0, productivity: 0, totalScore },
       });
     saved++;
   }
@@ -245,36 +235,29 @@ router.post("/kpis/calculate", async (req, res) => {
     res.status(400).json({ error: "employeeId, month, and year are required" }); return;
   }
 
-  const [w, kras, tasks, [existing]] = await Promise.all([
+  const [w, kras, [existing]] = await Promise.all([
     getWeights(),
     db.select().from(krasTable).where(and(eq(krasTable.employeeId, employeeId), ne(krasTable.hrApprovalStatus, "hr_rejected"))),
-    db.select().from(tasksTable).where(eq(tasksTable.assignedToId, employeeId)),
     db.select().from(kpisTable).where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
   ]);
 
-  // Weighted KRA achievement: uses each KRA's own weightage field
   const kraAchievement = calcKraAchievement(kras);
+  const punctuality = existing?.punctuality ?? 0;
+  const discipline  = existing?.discipline ?? 0;
 
-  const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
-  const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
-
-  const productivity = existing?.productivity ?? 0;
-  const punctuality  = existing?.punctuality ?? 0;
-  const discipline   = existing?.discipline ?? 0;
-
-  const totalScore = calcTotalScore({ kraAchievement, taskCompletion, productivity, punctuality, discipline }, w);
+  const totalScore = calcTotalScore({ kraAchievement, punctuality, discipline }, w);
 
   const [kpi] = await db.insert(kpisTable)
-    .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+    .values({ employeeId, month, year, kraAchievement, taskCompletion: 0, productivity: 0, punctuality, discipline, totalScore })
     .onConflictDoUpdate({
       target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
-      set: { kraAchievement, taskCompletion, totalScore },
+      set: { kraAchievement, taskCompletion: 0, productivity: 0, totalScore },
     })
     .returning();
 
   await db.insert(activityLogTable).values({
     type: "kpi_updated",
-    description: `KPI auto-calculated for employee ${employeeId}: KRA=${kraAchievement}% (weighted), Tasks=${taskCompletion}%, Total=${totalScore}%`,
+    description: `KPI auto-calculated for employee ${employeeId}: KRA=${kraAchievement}% (weighted), Total=${totalScore}%`,
     entityId: kpi!.id,
     entityType: "kpi",
   });

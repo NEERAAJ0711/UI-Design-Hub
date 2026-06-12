@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, krasTable, departmentsTable, employeesTable, activityLogTable, kpisTable, tasksTable, scoreWeightsTable } from "@workspace/db";
+import { db, krasTable, departmentsTable, employeesTable, activityLogTable, kpisTable, scoreWeightsTable } from "@workspace/db";
 import { eq, and, ne } from "drizzle-orm";
 import {
   CreateKraBody,
@@ -128,15 +128,12 @@ router.patch("/kras/:id/score", async (req, res) => {
       const year  = new Date().getFullYear();
 
       const [weightsRow] = await db.select().from(scoreWeightsTable);
-      const w = weightsRow ?? { kraWeight: 40, taskCompletionWeight: 30, productivityWeight: 15, punctualityWeight: 10, disciplineWeight: 5 };
+      const w = weightsRow ?? { kraWeight: 70, punctualityWeight: 20, disciplineWeight: 10 };
 
-      const [empKras, tasks, [existingKpi]] = await Promise.all([
+      const [empKras, [existingKpi]] = await Promise.all([
         db.select({ achievementPct: krasTable.achievementPct, weightage: krasTable.weightage })
           .from(krasTable)
           .where(and(eq(krasTable.employeeId, employeeId), ne(krasTable.hrApprovalStatus, "hr_rejected"))),
-        db.select({ status: tasksTable.status })
-          .from(tasksTable)
-          .where(eq(tasksTable.assignedToId, employeeId)),
         db.select().from(kpisTable)
           .where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
       ]);
@@ -154,22 +151,18 @@ router.patch("/kras/:id/score", async (req, res) => {
         }
       }
 
-      const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
-      const taskCompletion = tasks.length ? Math.round((doneTasks / tasks.length) * 1000) / 10 : 0;
-      const productivity = existingKpi?.productivity ?? 0;
-      const punctuality  = existingKpi?.punctuality ?? 0;
-      const discipline   = existingKpi?.discipline ?? 0;
+      const punctuality = existingKpi?.punctuality ?? 0;
+      const discipline  = existingKpi?.discipline ?? 0;
 
-      const totalWeight = w.kraWeight + w.taskCompletionWeight + w.productivityWeight + w.punctualityWeight + w.disciplineWeight;
-      const raw = kraAchievement * w.kraWeight + taskCompletion * w.taskCompletionWeight
-                + productivity * w.productivityWeight + punctuality * w.punctualityWeight + discipline * w.disciplineWeight;
+      const totalWeight = w.kraWeight + w.punctualityWeight + w.disciplineWeight;
+      const raw = kraAchievement * w.kraWeight + punctuality * w.punctualityWeight + discipline * w.disciplineWeight;
       const totalScore = Math.round((raw / (totalWeight || 100)) * 10) / 10;
 
       await db.insert(kpisTable)
-        .values({ employeeId, month, year, kraAchievement, taskCompletion, productivity, punctuality, discipline, totalScore })
+        .values({ employeeId, month, year, kraAchievement, taskCompletion: 0, productivity: 0, punctuality, discipline, totalScore })
         .onConflictDoUpdate({
           target: [kpisTable.employeeId, kpisTable.month, kpisTable.year],
-          set: { kraAchievement, taskCompletion, totalScore },
+          set: { kraAchievement, taskCompletion: 0, productivity: 0, totalScore },
         });
     } catch {
       // KPI recalculation is non-critical

@@ -60,7 +60,6 @@ const roleColors: Record<string, string> = {
 const MAIN_NAV = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ALL_ROLES },
   { name: "Employees", href: "/employees", icon: Users, roles: ["admin", "management", "hod", "manager"] },
-  { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ALL_ROLES },
   { name: "KRAs", href: "/kras", icon: Target, roles: ALL_ROLES },
   { name: "KPIs", href: "/kpis", icon: BarChart, roles: ["admin", "management", "hod", "manager"] },
   { name: "Reports", href: "/reports", icon: FileBarChart, roles: ["admin", "management", "hod", "manager"] },
