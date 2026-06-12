@@ -61,7 +61,7 @@ catalogs:
       specifier: ^4.1.14
       version: 4.3.0
     tsx:
-      specifier: ^4.21.0
+      specifier: 4.21.0
       version: 4.21.0
     vite:
       specifier: ^7.3.2
@@ -633,6 +633,9 @@ importers:
 
   lib/db:
     dependencies:
+      bcryptjs:
+        specifier: ^3.0.3
+        version: 3.0.3
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
@@ -655,6 +658,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
 
   scripts:
     devDependencies:
