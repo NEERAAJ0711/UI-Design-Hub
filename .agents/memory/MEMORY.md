@@ -1,0 +1,1 @@
+- [Replit Proxy API Routing](replit-proxy-routing.md) — pike proxy routes /api/* to port 8080 (API artifact), NOT through Vite proxy; API server must run on 8080.
