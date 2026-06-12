@@ -71,19 +71,20 @@ function calcTotalScore(
 }
 
 /**
- * Compute KRA achievement as a WEIGHTED average of achievementPct,
- * weighted by each KRA's own weightage field.
- * Falls back to 0 if no KRAs have weightage > 0.
+ * Compute KRA achievement as a WEIGHTED average of achievementPct.
+ * Only KRAs that have a score set (achievementPct != null) are included.
+ * KRAs with null achievementPct are excluded from both numerator and denominator
+ * so unscored KRAs do not artificially drag the average down.
  */
 function calcKraAchievement(kras: { achievementPct?: number | null; weightage: number }[]): number {
-  const totalWeightage = kras.reduce((s, k) => s + k.weightage, 0);
+  const scored = kras.filter((k) => k.achievementPct != null);
+  if (!scored.length) return 0;
+
+  const totalWeightage = scored.reduce((s, k) => s + k.weightage, 0);
   if (totalWeightage === 0) {
-    // No KRA weightage defined — fall back to simple average of non-null scores
-    const scored = kras.filter((k) => k.achievementPct != null);
-    if (!scored.length) return 0;
     return Math.round((scored.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / scored.length) * 10) / 10;
   }
-  const weighted = kras.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0);
+  const weighted = scored.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0);
   return Math.round((weighted / totalWeightage) * 10) / 10;
 }
 

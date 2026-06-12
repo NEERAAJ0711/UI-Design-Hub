@@ -141,13 +141,17 @@ router.patch("/kras/:id/score", async (req, res) => {
           .where(and(eq(kpisTable.employeeId, employeeId), eq(kpisTable.month, month), eq(kpisTable.year, year))),
       ]);
 
-      const totalWeightage = empKras.reduce((s, k) => s + k.weightage, 0);
+      const scoredKras = empKras.filter((k) => k.achievementPct != null);
       let kraAchievement: number;
-      if (totalWeightage === 0) {
-        const scored = empKras.filter((k) => k.achievementPct != null);
-        kraAchievement = scored.length ? Math.round((scored.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / scored.length) * 10) / 10 : 0;
+      if (!scoredKras.length) {
+        kraAchievement = 0;
       } else {
-        kraAchievement = Math.round((empKras.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0) / totalWeightage) * 10) / 10;
+        const totalWeightage = scoredKras.reduce((s, k) => s + k.weightage, 0);
+        if (totalWeightage === 0) {
+          kraAchievement = Math.round((scoredKras.reduce((s, k) => s + (k.achievementPct ?? 0), 0) / scoredKras.length) * 10) / 10;
+        } else {
+          kraAchievement = Math.round((scoredKras.reduce((s, k) => s + (k.achievementPct ?? 0) * k.weightage, 0) / totalWeightage) * 10) / 10;
+        }
       }
 
       const doneTasks = tasks.filter((t) => t.status === "approved" || t.status === "completed").length;
