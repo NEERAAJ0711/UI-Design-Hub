@@ -45,8 +45,8 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=8081 BASE_PATH=/ pnpm --filter @workspace/kra-kpi-app run dev"
-waitForPort = 8080
+args = "PORT=8099 BASE_PATH=/ pnpm --filter @workspace/kra-kpi-app run dev"
+waitForPort = 8099
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -71,6 +71,10 @@ externalPort = 80
 [[ports]]
 localPort = 8082
 externalPort = 3001
+
+[[ports]]
+localPort = 8099
+externalPort = 8099
 
 [[ports]]
 localPort = 22778
