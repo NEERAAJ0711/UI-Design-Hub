@@ -152,13 +152,7 @@ router.get("/dashboard/recent-activity", async (req, res) => {
   })));
 });
 
-// Alias: /dashboard/employee/:id → /dashboard/employee-summary?employeeId=:id
-router.get("/dashboard/employee/:id", (req, res) => {
-  res.redirect(`/api/dashboard/employee-summary?employeeId=${req.params.id}`);
-});
-
-router.get("/dashboard/employee-summary", async (req, res) => {
-  const { employeeId } = GetEmployeeDashboardSummaryQueryParams.parse(req.query);
+async function employeeSummaryHandler(employeeId: number, res: Response) {
   const today = new Date().toISOString().split("T")[0];
 
   const myTasks = await db.select().from(tasksTable).where(eq(tasksTable.assignedToId, employeeId));
@@ -209,6 +203,18 @@ router.get("/dashboard/employee-summary", async (req, res) => {
       createdAt: a.createdAt.toISOString(),
     })),
   });
+}
+
+// Alias: /dashboard/employee/:id (in case legacy code calls this URL pattern)
+router.get("/dashboard/employee/:id", async (req, res) => {
+  const employeeId = Number(req.params.id);
+  if (!Number.isFinite(employeeId)) return res.status(400).json({ error: "Invalid employee id" });
+  await employeeSummaryHandler(employeeId, res);
+});
+
+router.get("/dashboard/employee-summary", async (req, res) => {
+  const { employeeId } = GetEmployeeDashboardSummaryQueryParams.parse(req.query);
+  await employeeSummaryHandler(employeeId, res);
 });
 
 router.get("/dashboard/pending-approvals", async (req, res) => {
